@@ -1,0 +1,23 @@
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+# environment secrets — never commit these
+.env
+.env.local
+.env.production
+backend/.env
+# Google Play service account key (contains private key)
+google-service-account.json
+# Expo generated native folders
+ios/
+android/
+# Backend data folder (local dev only)
+backend/data/

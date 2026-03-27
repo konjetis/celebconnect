@@ -1,0 +1,49 @@
+# CelebConnect — Cursor AI Rules
+
+## Project Overview
+CelebConnect is a cross-platform React Native (Expo) mobile app that:
+- Lets users add birthday/anniversary events to a calendar
+- Automatically sends WhatsApp messages and Instagram posts on event days
+- Supports iOS and Android
+
+## Tech Stack
+- React Native + Expo SDK 52
+- TypeScript (strict mode)
+- React Navigation v6 (Stack + Bottom Tabs)
+- Zustand (state management)
+- AsyncStorage (local persistence)
+- expo-secure-store (auth tokens)
+- react-native-calendars (calendar UI)
+- react-native-paper (UI components)
+
+## Code Style
+- Use functional components with hooks only (no class components)
+- All files must be TypeScript (.tsx / .ts)
+- Import aliases: @screens, @components, @context, @hooks, @utils, @services, @types
+- Use StyleSheet.create() for all styles
+- Colors and spacing from src/utils/theme.ts
+- Prefer named exports for components, default exports for screens
+
+## File Structure
+src/
+  screens/      # auth/, home/, calendar/, account/
+  components/   # common/, calendar/, auth/
+  navigation/   # AppNavigator.tsx
+  context/      # AuthContext.tsx, EventContext.tsx
+  hooks/        # custom hooks
+  utils/        # theme.ts, helpers.ts
+  types/        # index.ts
+  services/     # API calls (WhatsApp, Instagram)
+
+## Key Features to Implement
+1. Auth: Login (email/phone), Register, Forgot Password
+2. Home: Upcoming events dashboard
+3. Calendar: Add/edit/delete events with recurrence
+4. Auto-messaging: WhatsApp Business API + Instagram Graph API
+5. Account: Profile editing, notification settings
+
+## When generating code:
+- Always add TypeScript types
+- Include error handling with try/catch
+- Use COLORS from theme for all color values
+- Follow existing component patterns in the codebase

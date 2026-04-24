@@ -65,9 +65,10 @@ birthday, reminder, WhatsApp, anniversary, celebration, events, calendar, greeti
 
 ## Privacy Policy URL
 
-> https://github.com/YOUR_USERNAME/celebconnect/blob/main/PRIVACY_POLICY.md
+> https://github.com/konjetis/celebconnect/blob/main/PRIVACY_POLICY.md
 
-*(Host this on your website or GitHub and paste the URL into the store listing)*
+Terms of Service URL:
+> https://github.com/konjetis/celebconnect/blob/main/TERMS_OF_SERVICE.md
 
 ---
 

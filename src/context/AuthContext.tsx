@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { AuthState, User, LoginCredentials, RegisterCredentials } from '../types';
+import * as authService from '../services/authService';
 
 // ─── State & Actions ─────────────────────────────────────────────────────────
 
@@ -66,7 +67,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userJson = await SecureStore.getItemAsync('user_data');
       if (token && userJson) {
         const user = JSON.parse(userJson) as User;
-        dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token } });
+
+        // Validate the stored token against the backend (if configured)
+        try {
+          const freshUser = await authService.validateToken(token);
+          await SecureStore.setItemAsync('user_data', JSON.stringify(freshUser));
+          dispatch({ type: 'LOGIN_SUCCESS', payload: { user: freshUser, token } });
+        } catch {
+          // Backend unreachable or token expired — restore from local cache
+          dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token } });
+        }
       } else {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
@@ -78,22 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (credentials: LoginCredentials) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      // TODO: Replace with real API call
-      // const response = await authService.login(credentials);
-      const mockUser: User = {
-        id: '1',
-        email: credentials.method === 'email' ? credentials.identifier : undefined,
-        phone: credentials.method === 'phone' ? credentials.identifier : undefined,
-        firstName: 'Suneetha',
-        lastName: 'K',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      const mockToken = 'mock_token_' + Date.now();
-
-      await SecureStore.setItemAsync('auth_token', mockToken);
-      await SecureStore.setItemAsync('user_data', JSON.stringify(mockUser));
-      dispatch({ type: 'LOGIN_SUCCESS', payload: { user: mockUser, token: mockToken } });
+      const { user, token } = await authService.login(credentials);
+      await SecureStore.setItemAsync('auth_token', token);
+      await SecureStore.setItemAsync('user_data', JSON.stringify(user));
+      dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token } });
     } catch (error) {
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;
@@ -103,21 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (credentials: RegisterCredentials) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      // TODO: Replace with real API call
-      const mockUser: User = {
-        id: Date.now().toString(),
-        email: credentials.method === 'email' ? credentials.email : undefined,
-        phone: credentials.method === 'phone' ? credentials.phone : undefined,
-        firstName: credentials.firstName,
-        lastName: credentials.lastName,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      const mockToken = 'mock_token_' + Date.now();
-
-      await SecureStore.setItemAsync('auth_token', mockToken);
-      await SecureStore.setItemAsync('user_data', JSON.stringify(mockUser));
-      dispatch({ type: 'LOGIN_SUCCESS', payload: { user: mockUser, token: mockToken } });
+      const { user, token } = await authService.register(credentials);
+      await SecureStore.setItemAsync('auth_token', token);
+      await SecureStore.setItemAsync('user_data', JSON.stringify(user));
+      dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token } });
     } catch (error) {
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;
@@ -131,8 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const forgotPassword = async (identifier: string) => {
-    // TODO: Replace with real API call
-    console.log('Forgot password for:', identifier);
+    await authService.forgotPassword(identifier);
   };
 
   const updateUser = (user: User) => {

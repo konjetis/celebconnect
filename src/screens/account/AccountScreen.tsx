@@ -4,6 +4,7 @@ import {
   StyleSheet, ScrollView, Alert, Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, SPACING } from '../../utils/theme';
 
@@ -39,14 +40,39 @@ export default function AccountScreen() {
   };
 
   const handlePickPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Please allow access to your photo library in Settings.');
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
     });
+
     if (!result.canceled && user) {
-      updateUser({ ...user, profilePhoto: result.assets[0].uri });
+      try {
+        // Copy the photo to the app's permanent document directory so it
+        // persists across sessions (the temp URI from ImagePicker is wiped on reload).
+        const photoDir = FileSystem.documentDirectory + 'photos/';
+        const dirInfo  = await FileSystem.getInfoAsync(photoDir);
+        if (!dirInfo.exists) {
+          await FileSystem.makeDirectoryAsync(photoDir, { intermediates: true });
+        }
+
+        const filename    = `profile_${user.id}.jpg`;
+        const destination = photoDir + filename;
+        await FileSystem.copyAsync({ from: result.assets[0].uri, to: destination });
+
+        updateUser({ ...user, profilePhoto: destination });
+      } catch (err) {
+        console.error('[AccountScreen] Failed to save profile photo:', err);
+        // Fallback: use the temp URI (works for the current session)
+        updateUser({ ...user, profilePhoto: result.assets[0].uri });
+      }
     }
   };
 

@@ -2,14 +2,30 @@
 
 require('dotenv').config();
 
+// ─── Error monitoring (Sentry) ────────────────────────────────────────────────
+// To enable:
+//   1. Run: npm install @sentry/node in the backend folder
+//   2. Set SENTRY_DSN in backend/.env
+//   3. Uncomment the lines below
+//
+// const Sentry = require('@sentry/node');
+// if (process.env.SENTRY_DSN) {
+//   Sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0.2 });
+// }
+
 const express = require('express');
 const cors    = require('cors');
 const { upsertEvent, removeEvent, readAll } = require('./store');
 const { startScheduler, sendTodaysMessages }  = require('./scheduler');
+const { router: authRouter, initUsersTable }  = require('./auth');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ─── Auth routes ─────────────────────────────────────────────────────────────
+
+app.use('/api/auth', authRouter);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 
@@ -79,6 +95,7 @@ async function main() {
   if (process.env.DATABASE_URL) {
     const { initDb } = require('./db');
     await initDb();
+    await initUsersTable();
   }
 
   const PORT = process.env.PORT ?? 3001;

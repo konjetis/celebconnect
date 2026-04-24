@@ -5,11 +5,15 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/images/icon.png",
     "splash": {
+      "image": "./assets/images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#6C63FF"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.celebconnect.app",
@@ -17,11 +21,17 @@
       "infoPlist": {
         "NSCalendarsUsageDescription": "CelebConnect needs access to your calendar to manage your events.",
         "NSContactsUsageDescription": "CelebConnect needs access to contacts to send celebration messages.",
-        "NSUserNotificationsUsageDescription": "CelebConnect sends you reminders before important events."
+        "NSUserNotificationsUsageDescription": "CelebConnect sends you reminders before important events.",
+        "LSApplicationQueriesSchemes": [
+          "whatsapp",
+          "instagram",
+          "instagram-stories"
+        ]
       }
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#6C63FF"
       },
       "package": "com.celebconnect.app",
@@ -50,8 +60,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_YOUR_EAS_PROJECT_ID"
+        "projectId": "08f6b445-abd0-4896-b244-e6cb64e95fe9"
       }
-    }
+    },
+    "owner": "konjetis"
   }
 }

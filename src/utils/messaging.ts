@@ -1,4 +1,4 @@
-import { Linking, Alert } from 'react-native';
+import { Linking, Alert, Clipboard } from 'react-native';
 import { CalendarEvent, EventContact } from '../types';
 import { generateWhatsAppMessage } from './helpers';
 
@@ -6,8 +6,7 @@ import { generateWhatsAppMessage } from './helpers';
 
 /**
  * Opens WhatsApp with a pre-filled message for the given contact.
- * The message template supports a {name} placeholder that gets replaced
- * with the contact's name.
+ * If WhatsApp is not installed, offers to copy the message to clipboard instead.
  */
 export async function openWhatsApp(
   contact: EventContact,
@@ -15,25 +14,33 @@ export async function openWhatsApp(
 ): Promise<void> {
   const message = generateWhatsAppMessage(messageTemplate, contact.name);
   const encoded = encodeURIComponent(message);
-
-  // Strip everything except digits and a leading +
-  const phone = (contact.phone ?? '').replace(/[^\d+]/g, '');
-
+  // WhatsApp requires digits only — no +, spaces, or dashes
+  const phone = (contact.phone ?? '').replace(/[^\d]/g, '');
   const url = phone
     ? `whatsapp://send?phone=${phone}&text=${encoded}`
-    : `whatsapp://send?text=${encoded}`;        // group — no phone target
+    : `whatsapp://send?text=${encoded}`;
 
-  const canOpen = await Linking.canOpenURL('whatsapp://send');
-  if (!canOpen) {
+  // Try to open WhatsApp directly — canOpenURL is unreliable in Expo Go
+  // because LSApplicationQueriesSchemes isn't declared in Expo Go's Info.plist
+  try {
+    await Linking.openURL(url);
+  } catch {
+    // WhatsApp not installed or couldn't open — offer clipboard fallback
     Alert.alert(
-      'WhatsApp not found',
-      'Make sure WhatsApp is installed on this device.',
-      [{ text: 'OK' }]
+      'Could Not Open WhatsApp',
+      `Would you like to copy the message to your clipboard instead?\n\n"${message}"`,
+      [
+        {
+          text: 'Copy Message',
+          onPress: () => {
+            Clipboard.setString(message);
+            Alert.alert('✅ Copied!', 'Message copied! You can paste it into WhatsApp or any chat app.');
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
     );
-    return;
   }
-
-  await Linking.openURL(url);
 }
 
 /**
@@ -42,23 +49,33 @@ export async function openWhatsApp(
  * - Many contacts → shows a pick-list so the user taps each one
  */
 export function sendWhatsAppMessages(event: CalendarEvent): void {
-  const contacts = event.contacts.filter(c => !c.instagramHandle); // WhatsApp contacts only
-  if (contacts.length === 0) return;
+  const contacts = event.contacts.filter(c => !c.instagramHandle);
 
-  const template = event.whatsappMessage ?? 'Happy {name}! 🎉';
+  // No recipients added — tell the user clearly
+  if (contacts.length === 0) {
+    Alert.alert(
+      '💬 No Recipients Added',
+      'Please edit this event, enable WhatsApp, and add at least one recipient with their phone number.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+
+  // Use WhatsApp message, then Notes, then a friendly default
+  const template = event.whatsappMessage?.trim() || event.description?.trim() || `Happy ${event.title}! 🎉`;
 
   if (contacts.length === 1) {
     openWhatsApp(contacts[0], template);
     return;
   }
 
-  // Multiple contacts — let the user choose
+  // Multiple contacts — show picker
   Alert.alert(
-    '💬 Send WhatsApp Messages',
-    'Tap a contact to open WhatsApp:',
+    '💬 Send WhatsApp Message',
+    `Message: "${template.substring(0, 60)}${template.length > 60 ? '...' : ''}"\n\nTap a recipient:`,
     [
       ...contacts.map(c => ({
-        text: c.isWhatsAppGroup ? `👥 ${c.name}` : `👤 ${c.name}`,
+        text: c.isWhatsAppGroup ? `👥 ${c.name}` : `👤 ${c.name} ${c.phone ? `(${c.phone})` : ''}`,
         onPress: () => openWhatsApp(c, template),
       })),
       { text: 'Cancel', style: 'cancel' as const },

@@ -2,13 +2,16 @@
 
 /**
  * Daily scheduler.
- * Runs at SEND_HOUR:SEND_MINUTE every day, finds all events for today,
+ * Runs at SEND_HOUR:SEND_MINUTE every day, finds all events for today
+ * (including recurring events whose next occurrence falls on today),
  * and automatically sends WhatsApp messages to every contact.
  */
 
 const cron = require('node-cron');
-const { getEventsForDate } = require('./store');
+const { getEventsForDate, readAll } = require('./store');
 const { sendWhatsAppMessage } = require('./whatsapp');
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function getTodayString() {
   const d = new Date();
@@ -18,13 +21,94 @@ function getTodayString() {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Returns true if a recurring event's pattern fires on the given dateString.
+ *
+ * recurrence values: 'none' | 'yearly' | 'monthly' | 'weekly'
+ * event.date is the original YYYY-MM-DD the event was first created for.
+ */
+function recurringEventMatchesToday(event, todayStr) {
+  if (!event.recurrence || event.recurrence === 'none') return false;
+
+  const original = new Date(event.date + 'T12:00:00'); // noon to avoid DST edge-cases
+  const today    = new Date(todayStr    + 'T12:00:00');
+
+  // Don't fire for a date before the original event
+  if (today <= original) return false;
+
+  switch (event.recurrence) {
+    case 'yearly':
+      // Same month and day, any future year
+      return (
+        today.getMonth() === original.getMonth() &&
+        today.getDate()  === original.getDate()
+      );
+
+    case 'monthly':
+      // Same day-of-month, any future month
+      return today.getDate() === original.getDate();
+
+    case 'weekly': {
+      // Same day-of-week, every 7 days from the original
+      const msPerDay  = 24 * 60 * 60 * 1000;
+      const diffDays  = Math.round((today - original) / msPerDay);
+      return diffDays % 7 === 0;
+    }
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Returns all events that should fire today —
+ * both exact-date matches AND recurring events whose pattern fires today.
+ */
+async function getEventsForToday(todayStr) {
+  // Direct date matches (non-recurring events set for today)
+  const exactMatches = await getEventsForDate(todayStr);
+  const exactIds = new Set(exactMatches.map(e => e.id));
+
+  // Check all events for recurring matches
+  const allEvents      = await readAll();
+  const recurringToday = allEvents.filter(
+    e => !exactIds.has(e.id) && recurringEventMatchesToday(e, todayStr)
+  );
+
+  return [...exactMatches, ...recurringToday];
+}
+
+// ─── Message helpers ──────────────────────────────────────────────────────────
+
 function replacePlaceholders(template, name) {
   return template.replace(/\{name\}/g, name);
 }
 
+/**
+ * For yearly recurrence, append the ordinal year suffix (e.g. "Happy 3rd Birthday!")
+ */
+function enrichTemplate(template, event, todayStr) {
+  if (event.recurrence !== 'yearly') return template;
+  const original = new Date(event.date + 'T12:00:00');
+  const today    = new Date(todayStr    + 'T12:00:00');
+  const years    = today.getFullYear() - original.getFullYear();
+  if (years <= 0) return template;
+  const suffix   = years === 1 ? 'st' : years === 2 ? 'nd' : years === 3 ? 'rd' : 'th';
+  // Only inject the year count if the template still contains the default pattern
+  if (template.includes(`Happy ${event.title}`)) {
+    return template.replace(
+      `Happy ${event.title}`,
+      `Happy ${years}${suffix} ${event.title}`
+    );
+  }
+  return template;
+}
+
+// ─── Main send function ───────────────────────────────────────────────────────
+
 async function sendTodaysMessages() {
   const today  = getTodayString();
-  const events = await getEventsForDate(today);   // now async
+  const events = await getEventsForToday(today);
 
   if (events.length === 0) {
     console.log(`[${new Date().toISOString()}] No events today (${today}).`);
@@ -36,8 +120,14 @@ async function sendTodaysMessages() {
   for (const event of events) {
     if (!event.whatsappEnabled) continue;
 
-    const template        = event.whatsappMessage || `Happy ${event.title}! 🎉`;
+    const baseTemplate     = event.whatsappMessage || `Happy ${event.title}! 🎉`;
+    const template         = enrichTemplate(baseTemplate, event, today);
     const whatsappContacts = (event.contacts || []).filter(c => c.phone && !c.instagramHandle);
+
+    if (whatsappContacts.length === 0) {
+      console.log(`  ⏭  "${event.title}" — WhatsApp enabled but no phone contacts. Skipping.`);
+      continue;
+    }
 
     for (const contact of whatsappContacts) {
       const message = replacePlaceholders(template, contact.name);
@@ -53,6 +143,8 @@ async function sendTodaysMessages() {
     }
   }
 }
+
+// ─── Scheduler ────────────────────────────────────────────────────────────────
 
 function startScheduler() {
   const hour   = process.env.SEND_HOUR   ?? '9';
@@ -71,4 +163,4 @@ function startScheduler() {
   return sendTodaysMessages; // expose for manual testing
 }
 
-module.exports = { startScheduler, sendTodaysMessages };
+module.exports = { startScheduler, sendTodaysMessages, recurringEventMatchesToday };

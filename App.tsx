@@ -7,6 +7,16 @@ import { EventProvider } from './src/context/EventContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { requestNotificationPermissions } from './src/utils/notifications';
 
+// ─── Error monitoring (Sentry) ────────────────────────────────────────────────
+// To enable:
+//   1. Run: npx expo install @sentry/react-native
+//   2. Replace YOUR_SENTRY_DSN below with your DSN from sentry.io
+//   3. Uncomment the three Sentry lines below
+//
+// import * as Sentry from '@sentry/react-native';
+// Sentry.init({ dsn: 'YOUR_SENTRY_DSN', tracesSampleRate: 0.2 });
+// export default Sentry.wrap(App);
+
 export default function App() {
   const notificationListener = useRef<Notifications.Subscription>();
   const responseListener = useRef<Notifications.Subscription>();

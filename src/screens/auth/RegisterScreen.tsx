@@ -41,12 +41,12 @@ export default function RegisterScreen({ navigation }: Props) {
     }
   };
 
-  const Field = ({ label, field, ...props }: { label: string; field: keyof typeof form } & any) => (
+  const Field = ({ label, field, ...props }: { label: string; field: keyof typeof form } & Record<string, unknown>) => (
     <View style={styles.inputGroup}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         style={styles.input}
-        value={form[field]}
+        value={form[field] as string}
         onChangeText={(v: string) => update(field, v)}
         {...props}
       />

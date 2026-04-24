@@ -18,8 +18,8 @@ import { requestNotificationPermissions } from './src/utils/notifications';
 // export default Sentry.wrap(App);
 
 export default function App() {
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
+  const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
   useEffect(() => {
     // Ask for notification permission on first launch

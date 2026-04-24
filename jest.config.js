@@ -1,7 +1,7 @@
 module.exports = {
   preset: 'jest-expo',
   setupFiles: ['./jest.setup.js'],
-  testPathIgnorePatterns: ['/node_modules/', '/android/', '/ios/'],
+  testPathIgnorePatterns: ['/node_modules/', '/android/', '/ios/', '/backend/'],
   transformIgnorePatterns: [
     'node_modules/(?!(' +
       '(jest-)?react-native' +

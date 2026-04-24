@@ -57,7 +57,7 @@ export default function AccountScreen() {
       try {
         // Copy the photo to the app's permanent document directory so it
         // persists across sessions (the temp URI from ImagePicker is wiped on reload).
-        const photoDir = FileSystem.documentDirectory + 'photos/';
+        const photoDir = ((FileSystem as any).documentDirectory as string ?? '') + 'photos/';
         const dirInfo  = await FileSystem.getInfoAsync(photoDir);
         if (!dirInfo.exists) {
           await FileSystem.makeDirectoryAsync(photoDir, { intermediates: true });

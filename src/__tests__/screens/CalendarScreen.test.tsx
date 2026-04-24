@@ -197,7 +197,8 @@ describe('CalendarScreen — navigation actions', () => {
 describe('CalendarScreen — delete flow', () => {
   it('calls deleteEvent after the user confirms deletion', async () => {
     const alertSpy = jest.spyOn(require('react-native').Alert, 'alert')
-      .mockImplementation((_title, _msg, buttons) => {
+      .mockImplementation((...args: unknown[]) => {
+        const buttons = args[2] as any[];
         const del = buttons?.find((b: any) => b.style === 'destructive');
         del?.onPress?.();
       });

@@ -149,8 +149,9 @@ describe('HomeScreen — delete flow', () => {
   it('calls deleteEvent with the correct event id after confirmation', async () => {
     // We need to mock Alert.alert to simulate the user pressing "Delete"
     const alertSpy = jest.spyOn(require('react-native').Alert, 'alert')
-      .mockImplementation((_title, _msg, buttons) => {
+      .mockImplementation((...args: unknown[]) => {
         // Auto-press the destructive "Delete" button
+        const buttons = args[2] as any[];
         const deleteBtn = buttons?.find((b: any) => b.style === 'destructive');
         deleteBtn?.onPress?.();
       });
@@ -174,7 +175,8 @@ describe('HomeScreen — delete flow', () => {
 
   it('does NOT call deleteEvent when the user presses Cancel', async () => {
     const alertSpy = jest.spyOn(require('react-native').Alert, 'alert')
-      .mockImplementation((_title, _msg, buttons) => {
+      .mockImplementation((...args: unknown[]) => {
+        const buttons = args[2] as any[];
         // Press the Cancel button instead
         const cancelBtn = buttons?.find((b: any) => b.style === 'cancel');
         cancelBtn?.onPress?.();

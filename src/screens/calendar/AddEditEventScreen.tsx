@@ -38,7 +38,7 @@ const RECURRENCES: { value: RecurrenceType; label: string }[] = [
 export default function AddEditEventScreen({ navigation, route }: Props) {
   const { addEvent, updateEvent, events } = useEvents();
   const isEdit = 'eventId' in route.params;
-  const existingEvent = isEdit ? events.find(e => e.id === route.params.eventId) : undefined;
+  const existingEvent = isEdit ? events.find(e => e.id === (route.params as { eventId: string }).eventId) : undefined;
 
   const [form, setForm] = useState({
     title: existingEvent?.title ?? '',

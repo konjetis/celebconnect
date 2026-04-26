@@ -132,7 +132,7 @@ async function sendTodaysMessages() {
     for (const contact of whatsappContacts) {
       const message = replacePlaceholders(template, contact.name);
       try {
-        await sendWhatsAppMessage(contact.phone, message);
+        await sendWhatsAppMessage(contact.phone, message, contact.name);
         console.log(`  ✅ Sent to ${contact.name} (${contact.phone}): "${message.substring(0, 60)}..."`);
       } catch (err) {
         console.error(`  ❌ Failed to send to ${contact.name} (${contact.phone}):`, err.message);

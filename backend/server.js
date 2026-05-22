@@ -18,6 +18,7 @@ const cors    = require('cors');
 const { upsertEvent, removeEvent, readAll } = require('./store');
 const { startScheduler, sendTodaysMessages }  = require('./scheduler');
 const { router: authRouter, initUsersTable }  = require('./auth');
+const instagramRouter = require('./instagram');
 
 const app = express();
 app.use(cors());
@@ -26,6 +27,7 @@ app.use(express.json());
 // ─── Auth routes ─────────────────────────────────────────────────────────────
 
 app.use('/api/auth', authRouter);
+app.use('/api/instagram', instagramRouter);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 

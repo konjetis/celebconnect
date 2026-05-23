@@ -3,8 +3,6 @@ import * as SecureStore from 'expo-secure-store';
 import { AuthState, User, LoginCredentials, RegisterCredentials } from '../types';
 import * as authService from '../services/authService';
 
-// ─── State & Actions ─────────────────────────────────────────────────────────
-
 type AuthAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'LOGIN_SUCCESS'; payload: { user: User; token: string } }
@@ -20,29 +18,17 @@ const initialState: AuthState = {
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
-    case 'SET_LOADING':
-      return { ...state, isLoading: action.payload };
-    case 'LOGIN_SUCCESS':
-      return {
-        ...state,
-        user: action.payload.user,
-        token: action.payload.token,
-        isAuthenticated: true,
-        isLoading: false,
-      };
-    case 'LOGOUT':
-      return { ...initialState, isLoading: false };
-    case 'UPDATE_USER':
-      return { ...state, user: action.payload };
-    default:
-      return state;
+    case 'SET_LOADING':   return { ...state, isLoading: action.payload };
+    case 'LOGIN_SUCCESS': return { ...state, user: action.payload.user, token: action.payload.token, isAuthenticated: true, isLoading: false };
+    case 'LOGOUT':        return { ...initialState, isLoading: false };
+    case 'UPDATE_USER':   return { ...state, user: action.payload };
+    default:              return state;
   }
 }
 
-// ─── Context ──────────────────────────────────────────────────────────────────
-
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
+  loginWithInstagram: (token: string, userId: string) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
   forgotPassword: (identifier: string) => Promise<void>;
@@ -51,15 +37,10 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Restore session on mount
-  useEffect(() => {
-    restoreSession();
-  }, []);
+  useEffect(() => { restoreSession(); }, []);
 
   const restoreSession = async () => {
     try {
@@ -67,14 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userJson = await SecureStore.getItemAsync('user_data');
       if (token && userJson) {
         const user = JSON.parse(userJson) as User;
-
-        // Validate the stored token against the backend (if configured)
         try {
           const freshUser = await authService.validateToken(token);
           await SecureStore.setItemAsync('user_data', JSON.stringify(freshUser));
           dispatch({ type: 'LOGIN_SUCCESS', payload: { user: freshUser, token } });
         } catch {
-          // Backend unreachable or token expired — restore from local cache
           dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token } });
         }
       } else {
@@ -96,6 +74,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;
     }
+  };
+
+  const loginWithInstagram = async (instagramToken: string, instagramUserId: string) => {
+    const user: User = {
+      id: instagramUserId,
+      firstName: 'Instagram',
+      lastName: 'User',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await SecureStore.setItemAsync('auth_token', instagramToken);
+    await SecureStore.setItemAsync('user_data', JSON.stringify(user));
+    dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token: instagramToken } });
   };
 
   const register = async (credentials: RegisterCredentials) => {
@@ -127,13 +118,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout, forgotPassword, updateUser }}>
+    <AuthContext.Provider value={{ ...state, login, loginWithInstagram, register, logout, forgotPassword, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);

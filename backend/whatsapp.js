@@ -38,7 +38,7 @@ async function sendWhatsAppMessage(toPhone, message, name = '', eventTitle = 'ev
         type:              'template',
         template: {
           name:       'scheduled_notification',
-          language:   { code: 'en' },
+          language:   { code: 'en_US' },
           components: [
             {
               type:       'body',
@@ -56,7 +56,7 @@ async function sendWhatsAppMessage(toPhone, message, name = '', eventTitle = 'ev
         type:              'template',
         template: {
           name:     'hello_world',
-          language: { code: 'en' },
+          language: { code: 'en_US' },
         },
       };
 

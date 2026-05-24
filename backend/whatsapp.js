@@ -60,7 +60,9 @@ async function sendWhatsAppMessage(toPhone, message, name = '', eventTitle = 'ev
         },
       };
 
-  const response = await axios.post(
+  let response;
+  try {
+  response = await axios.post(
     `${BASE_URL}/${phoneNumberId}/messages`,
     body,
     {
@@ -71,6 +73,10 @@ async function sendWhatsAppMessage(toPhone, message, name = '', eventTitle = 'ev
     }
   );
 
+  } catch (err) {
+    console.error('[WhatsApp] FULL ERROR:', JSON.stringify(err.response?.data, null, 2));
+    throw err;
+  }
   console.log(`  [WhatsApp] Sent to ${cleanPhone} (${isProduction ? `scheduled_notification: Hello ${firstName}, notification for ${cleanEventTitle}` : 'hello_world template'})`);
   return response.data;
 }

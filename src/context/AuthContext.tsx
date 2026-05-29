@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
 import { AuthState, User, LoginCredentials, RegisterCredentials } from '../types';
 import * as authService from '../services/authService';
 
@@ -37,6 +38,23 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// ─── Push token registration ──────────────────────────────────────────────────
+
+async function registerPushToken(token: string): Promise<void> {
+  try {
+    const { data: tokenData } = await Notifications.getExpoPushTokenAsync();
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+    if (!backendUrl || !tokenData) return;
+    await fetch(`${backendUrl}/api/auth/push-token`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body:    JSON.stringify({ token: tokenData }),
+    });
+  } catch {
+    // Non-fatal — push notifications just won't work if this fails
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
@@ -55,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token } });
         }
+        registerPushToken(token);
       } else {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
@@ -70,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await SecureStore.setItemAsync('auth_token', token);
       await SecureStore.setItemAsync('user_data', JSON.stringify(user));
       dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token } });
+      registerPushToken(token);
     } catch (error) {
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;
@@ -96,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await SecureStore.setItemAsync('auth_token', token);
       await SecureStore.setItemAsync('user_data', JSON.stringify(user));
       dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token } });
+      registerPushToken(token);
     } catch (error) {
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;

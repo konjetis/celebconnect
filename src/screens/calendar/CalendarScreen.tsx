@@ -44,8 +44,12 @@ export default function CalendarScreen({ navigation }: Props) {
     ]);
   };
 
-  const renderEvent = ({ item }: { item: CalendarEvent }) => (
-    <View style={styles.eventCard}>
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const renderEvent = ({ item }: { item: CalendarEvent }) => {
+    const isItemToday = item.date === todayStr;
+    return (
+    <View style={[styles.eventCard, isItemToday && styles.eventCardToday]}>
       <Text style={styles.eventEmoji}>{getCategoryEmoji(item.category)}</Text>
       <View style={styles.eventInfo}>
         <Text style={styles.eventTitle}>{item.title}</Text>
@@ -57,18 +61,24 @@ export default function CalendarScreen({ navigation }: Props) {
           <View style={styles.sendRow}>
             {item.whatsappEnabled && (
               <TouchableOpacity
-                style={styles.sendBtn}
+                style={[styles.sendBtn, isItemToday && styles.sendBtnToday]}
                 onPress={() => sendWhatsAppMessages(item)}
+                activeOpacity={0.8}
               >
-                <Text style={styles.sendBtnText}>💬 Send WhatsApp</Text>
+                <Text style={styles.sendBtnText}>
+                  {isItemToday ? '🚀 Send Now' : '💬 Send WhatsApp'}
+                </Text>
               </TouchableOpacity>
             )}
             {item.instagramEnabled && (
               <TouchableOpacity
-                style={[styles.sendBtn, styles.sendBtnIG]}
+                style={[styles.sendBtn, styles.sendBtnIG, isItemToday && styles.sendBtnTodayIG]}
                 onPress={() => openInstagramAccounts(item)}
+                activeOpacity={0.8}
               >
-                <Text style={styles.sendBtnText}>📸 Open Instagram</Text>
+                <Text style={styles.sendBtnText}>
+                  {isItemToday ? '🚀 Open Now' : '📸 Open Instagram'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -86,7 +96,8 @@ export default function CalendarScreen({ navigation }: Props) {
         </TouchableOpacity>
       </View>
     </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -159,6 +170,7 @@ const styles = StyleSheet.create({
     borderRadius: 14, padding: SPACING.md, marginBottom: SPACING.sm,
     borderWidth: 1, borderColor: COLORS.border,
   },
+  eventCardToday: { borderColor: COLORS.primary, borderWidth: 2 },
   eventEmoji: { fontSize: 28, marginRight: SPACING.sm },
   eventInfo: { flex: 1 },
   eventTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text },
@@ -171,6 +183,14 @@ const styles = StyleSheet.create({
   sendBtn: {
     backgroundColor: '#25D366', borderRadius: 20,
     paddingHorizontal: 10, paddingVertical: 5,
+  },
+  sendBtnToday: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    shadowColor: '#25D366', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4, shadowRadius: 4, elevation: 3,
+  },
+  sendBtnTodayIG: {
+    shadowColor: '#C13584',
   },
   sendBtnIG: { backgroundColor: '#C13584' },
   sendBtnText: { color: '#fff', fontSize: 11, fontWeight: '700' },

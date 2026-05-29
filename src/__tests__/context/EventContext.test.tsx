@@ -13,6 +13,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EventProvider, useEvents } from '../../context/EventContext';
 import { CalendarEvent } from '../../types';
 
+// ─── Mock notifications so we can spy on notifyTodayEventNow ──────────────────
+// Note: jest.mock is hoisted, so we can't reference module-level variables inside
+// the factory. Import the mocked module after to get spy references.
+jest.mock('../../utils/notifications', () => ({
+  scheduleEventNotification: jest.fn(() => Promise.resolve('notif-id')),
+  cancelEventNotification:   jest.fn(() => Promise.resolve()),
+  notifyTodayEventNow:       jest.fn(() => Promise.resolve()),
+}));
+
+import * as notificationsModule from '../../utils/notifications';
+const mockNotifyTodayEventNow = notificationsModule.notifyTodayEventNow as jest.Mock;
+
+// ─── Mock backend sync (fire-and-forget, not under test here) ─────────────────
+jest.mock('../../services/backendSync', () => ({
+  syncEventToBackend:     jest.fn(() => Promise.resolve()),
+  deleteEventFromBackend: jest.fn(() => Promise.resolve()),
+}));
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'celebconnect_events';
@@ -325,6 +343,102 @@ describe('EventProvider — getUpcomingEvents', () => {
 
     const sorted = upcomingFn!(30);
     expect(sorted.map(e => e.id)).toEqual(['early', 'mid', 'late']);
+  });
+});
+
+describe('EventProvider — notifyTodayEventNow (same-day add)', () => {
+  const TODAY = new Date().toISOString().split('T')[0];
+  const FUTURE = '2099-12-31';
+
+  beforeEach(() => {
+    mockNotifyTodayEventNow.mockClear();
+  });
+
+  const baseEventData = {
+    title: 'Birthday',
+    category: 'birthday' as const,
+    recurrence: 'yearly' as const,
+    contacts: [{ id: 'c1', name: 'Alice', phone: '+1234567890' }],
+    instagramEnabled: false,
+    notifyDaysBefore: 0,
+  };
+
+  it('calls notifyTodayEventNow when event date is today AND whatsappEnabled', async () => {
+    let addFn: ((data: any) => Promise<void>) | undefined;
+
+    function Consumer() {
+      const { addEvent } = useEvents();
+      addFn = addEvent;
+      return null;
+    }
+
+    renderWithProvider(<Consumer />);
+
+    await act(async () => {
+      await addFn?.({ ...baseEventData, date: TODAY, whatsappEnabled: true });
+    });
+
+    expect(mockNotifyTodayEventNow).toHaveBeenCalledTimes(1);
+    expect(mockNotifyTodayEventNow.mock.calls[0][0].date).toBe(TODAY);
+  });
+
+  it('does NOT call notifyTodayEventNow for a future event', async () => {
+    let addFn: ((data: any) => Promise<void>) | undefined;
+
+    function Consumer() {
+      const { addEvent } = useEvents();
+      addFn = addEvent;
+      return null;
+    }
+
+    renderWithProvider(<Consumer />);
+
+    await act(async () => {
+      await addFn?.({ ...baseEventData, date: FUTURE, whatsappEnabled: true });
+    });
+
+    expect(mockNotifyTodayEventNow).not.toHaveBeenCalled();
+  });
+
+  it('does NOT call notifyTodayEventNow when whatsappEnabled is false', async () => {
+    let addFn: ((data: any) => Promise<void>) | undefined;
+
+    function Consumer() {
+      const { addEvent } = useEvents();
+      addFn = addEvent;
+      return null;
+    }
+
+    renderWithProvider(<Consumer />);
+
+    await act(async () => {
+      await addFn?.({ ...baseEventData, date: TODAY, whatsappEnabled: false });
+    });
+
+    expect(mockNotifyTodayEventNow).not.toHaveBeenCalled();
+  });
+
+  it('calls notifyTodayEventNow when updating a today event to whatsappEnabled', async () => {
+    const existing = makeEvent({ id: 'upd-today', date: TODAY, whatsappEnabled: false });
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([existing]));
+
+    let updateFn: ((event: CalendarEvent) => Promise<void>) | undefined;
+
+    function Consumer() {
+      const { updateEvent, loadEvents } = useEvents();
+      React.useEffect(() => { loadEvents(); }, []);
+      updateFn = updateEvent;
+      return null;
+    }
+
+    renderWithProvider(<Consumer />);
+    await act(async () => {});
+
+    await act(async () => {
+      await updateFn?.({ ...existing, whatsappEnabled: true });
+    });
+
+    expect(mockNotifyTodayEventNow).toHaveBeenCalledTimes(1);
   });
 });
 

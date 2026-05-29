@@ -103,26 +103,24 @@ export default function HomeScreen() {
               <Text style={styles.eventEmoji}>{getCategoryEmoji(event.category)}</Text>
               <View style={styles.eventInfo}>
                 <Text style={styles.eventTitle}>{event.title}</Text>
-                <Text style={styles.todayText}>Happening today!</Text>
-                {(event.whatsappEnabled || event.instagramEnabled) && (
-                  <View style={styles.sendRow}>
-                    {event.whatsappEnabled && (
-                      <TouchableOpacity
-                        style={styles.sendBtnToday}
-                        onPress={() => sendWhatsAppMessages(event)}
-                      >
-                        <Text style={styles.sendBtnTodayText}>💬 Send WhatsApp</Text>
-                      </TouchableOpacity>
-                    )}
-                    {event.instagramEnabled && (
-                      <TouchableOpacity
-                        style={[styles.sendBtnToday, styles.sendBtnTodayIG]}
-                        onPress={() => openInstagramAccounts(event)}
-                      >
-                        <Text style={styles.sendBtnTodayText}>📸 Open Instagram</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                <Text style={styles.todayText}>🎉 Happening today!</Text>
+                {event.whatsappEnabled && (
+                  <TouchableOpacity
+                    style={styles.sendNowBtn}
+                    onPress={() => sendWhatsAppMessages(event)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.sendNowBtnText}>🚀 Send Now via WhatsApp</Text>
+                  </TouchableOpacity>
+                )}
+                {event.instagramEnabled && (
+                  <TouchableOpacity
+                    style={[styles.sendNowBtn, styles.sendNowBtnIG]}
+                    onPress={() => openInstagramAccounts(event)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.sendNowBtnText}>📸 Open Instagram Profile</Text>
+                  </TouchableOpacity>
                 )}
               </View>
               <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(event)}>
@@ -225,13 +223,15 @@ const styles = StyleSheet.create({
   },
   sendBtnIG: { backgroundColor: '#C13584' },
   sendBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  sendBtnToday: {
-    backgroundColor: '#fff', borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: COLORS.primary,
+  sendNowBtn: {
+    backgroundColor: '#25D366', borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 10,
+    marginTop: 10, alignItems: 'center',
+    shadowColor: '#25D366', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
   },
-  sendBtnTodayIG: { borderColor: '#C13584' },
-  sendBtnTodayText: { color: COLORS.primary, fontSize: 12, fontWeight: '700' },
+  sendNowBtnIG: { backgroundColor: '#C13584', shadowColor: '#C13584' },
+  sendNowBtnText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
   daysTextToday: { color: '#fff' },
   deleteBtn: { padding: 8, backgroundColor: '#FFF0F0', borderRadius: 10, marginLeft: SPACING.sm },
   deleteBtnText: { fontSize: 16 },

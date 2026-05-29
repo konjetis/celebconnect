@@ -80,6 +80,47 @@ export async function scheduleEventNotification(
   return id;
 }
 
+// ─── Immediate (today) ────────────────────────────────────────────────────────
+
+/**
+ * Fires a notification immediately (2-second delay) for an event happening today.
+ * Each WhatsApp contact gets its own notification so the user can tap each one
+ * and open WhatsApp with the correct pre-filled message.
+ *
+ * Called when the user saves an event whose date is today, after the 9 AM
+ * scheduler has already run.
+ */
+export async function notifyTodayEventNow(event: CalendarEvent): Promise<void> {
+  const granted = await requestNotificationPermissions();
+  if (!granted) return;
+
+  const waContacts = event.contacts.filter(c => c.phone && !c.instagramHandle);
+  if (waContacts.length === 0) return;
+
+  const template = event.whatsappMessage?.trim() || `Happy ${event.title}! 🎉`;
+
+  for (let i = 0; i < waContacts.length; i++) {
+    const contact = waContacts[i];
+    const message = template.replace(/\{name\}/g, contact.name);
+    const cleanPhone = (contact.phone ?? '').replace(/[^\d]/g, '');
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `${getCategoryEmoji(event.category)} ${event.title} — Today! 🎉`,
+        body:  `Tap to send ${contact.name} a WhatsApp message`,
+        sound: true,
+        data: {
+          waPhone:    contact.phone ?? '',
+          message,
+          eventId:    event.id,
+          eventTitle: event.title,
+        },
+      },
+      trigger: { seconds: 2 + i } as any, // stagger slightly if multiple contacts
+    });
+  }
+}
+
 // ─── Cancel ───────────────────────────────────────────────────────────────────
 
 /**

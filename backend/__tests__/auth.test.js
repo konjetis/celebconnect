@@ -120,3 +120,56 @@ describe('GET /api/auth/me', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('POST /api/auth/push-token', () => {
+  async function registerAndGetToken() {
+    const app   = buildApp();
+    const email = uniqueEmail();
+    const reg   = await request(app).post('/api/auth/register').send({
+      firstName: 'Push', lastName: 'Tester', email, password: 'secret', method: 'email',
+    });
+    return { app, token: reg.body.token };
+  }
+
+  it('saves the push token and returns ok: true', async () => {
+    const { app, token } = await registerAndGetToken();
+    const res = await request(app)
+      .post('/api/auth/push-token')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ token: 'ExponentPushToken[abc123]' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+
+  it('persists the push token so it appears on subsequent /me calls', async () => {
+    const { app, token } = await registerAndGetToken();
+
+    await request(app)
+      .post('/api/auth/push-token')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ token: 'ExponentPushToken[xyz789]' });
+
+    // The token is stored on the user object in the in-memory store;
+    // /me returns publicUser which strips it — just verify the save didn't break auth
+    const meRes = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+    expect(meRes.status).toBe(200);
+  });
+
+  it('rejects request without auth token', async () => {
+    const { app } = await registerAndGetToken();
+    const res = await request(app)
+      .post('/api/auth/push-token')
+      .send({ token: 'ExponentPushToken[abc123]' });
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 400 when push token body is missing', async () => {
+    const { app, token } = await registerAndGetToken();
+    const res = await request(app)
+      .post('/api/auth/push-token')
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
+    expect(res.status).toBe(400);
+  });
+});

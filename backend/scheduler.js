@@ -4,12 +4,16 @@
  * Daily scheduler.
  * Runs at SEND_HOUR:SEND_MINUTE every day, finds all events for today
  * (including recurring events whose next occurrence falls on today),
- * and automatically sends WhatsApp messages to every contact.
+ * and sends a push notification to the user's phone for each contact.
+ *
+ * When the user taps a notification, the app opens WhatsApp with the
+ * message pre-filled — so the message comes from their personal number.
  */
 
-const cron = require('node-cron');
+const cron  = require('node-cron');
+const axios = require('axios');
 const { getEventsForDate, readAll } = require('./store');
-const { sendWhatsAppMessage } = require('./whatsapp');
+const { getAllUsers } = require('./auth');
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -104,6 +108,29 @@ function enrichTemplate(template, event, todayStr) {
   return template;
 }
 
+// ─── Push notification sender ─────────────────────────────────────────────────
+
+/**
+ * Sends a push notification via Expo's Push API.
+ * Each message carries the WhatsApp phone + text in its data payload
+ * so the app can open the WhatsApp deep link when tapped.
+ */
+async function sendPushNotification({ expoPushToken, title, body, data }) {
+  const message = {
+    to:    expoPushToken,
+    sound: 'default',
+    title,
+    body,
+    data,
+  };
+  const response = await axios.post(
+    'https://exp.host/--/api/v2/push/send',
+    message,
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+  return response.data;
+}
+
 // ─── Main send function ───────────────────────────────────────────────────────
 
 async function sendTodaysMessages() {
@@ -116,6 +143,15 @@ async function sendTodaysMessages() {
   }
 
   console.log(`[${new Date().toISOString()}] Processing ${events.length} event(s) for ${today}...`);
+
+  // Collect all Expo push tokens from registered users
+  const allUsers   = await getAllUsers();
+  const pushTokens = allUsers.map(u => u.expoPushToken).filter(Boolean);
+
+  if (pushTokens.length === 0) {
+    console.log('  ⚠️  No push tokens registered — no notifications sent.');
+    return;
+  }
 
   for (const event of events) {
     if (!event.whatsappEnabled) continue;
@@ -131,15 +167,30 @@ async function sendTodaysMessages() {
 
     for (const contact of whatsappContacts) {
       const message = replacePlaceholders(template, contact.name);
-      try {
-        await sendWhatsAppMessage(contact.phone, message, contact.name, event.title);
-        console.log(`  ✅ Sent to ${contact.name} (${contact.phone}): "${message.substring(0, 60)}..."`);
-      } catch (err) {
-        console.error(`  ❌ Failed to send to ${contact.name} (${contact.phone}):`, err.message);
+
+      // Send one push notification per token (usually just one — the owner's phone)
+      for (const token of pushTokens) {
+        try {
+          await sendPushNotification({
+            expoPushToken: token,
+            title: `${event.title} 🎉`,
+            body:  `Tap to send ${contact.name} a WhatsApp message`,
+            data: {
+              phone:    contact.name,    // display name for the notification
+              waPhone:  contact.phone,   // actual phone number for the deep link
+              message,
+              eventId:  event.id,
+              eventTitle: event.title,
+            },
+          });
+          console.log(`  ✅ Push sent for "${event.title}" → ${contact.name} (${contact.phone})`);
+        } catch (err) {
+          console.error(`  ❌ Push failed for "${event.title}" → ${contact.name}:`, err.message);
+        }
       }
 
-      // Small delay between sends to avoid rate limits
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Small delay between sends
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
   }
 }

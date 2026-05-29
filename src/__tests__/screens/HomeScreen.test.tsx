@@ -107,10 +107,26 @@ describe('HomeScreen — rendering', () => {
       makeEvent({ id: 'today-evt', title: 'Today\'s Party', date: todayStr }),
     ];
     const { getAllByText } = render(<HomeScreen />);
-    // "Today" appears in both section header and date labels — at least one match expected
     expect(getAllByText(/Today/i).length).toBeGreaterThanOrEqual(1);
-    // Event appears in both "Today" and "Next 30 Days" sections
     expect(getAllByText("Today's Party").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows "Send Now via WhatsApp" button for today\'s WhatsApp-enabled events', () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    mockUpcomingEvents = [
+      makeEvent({ id: 'today-wa', date: todayStr, whatsappEnabled: true }),
+    ];
+    const { getByText } = render(<HomeScreen />);
+    expect(getByText(/Send Now via WhatsApp/i)).toBeTruthy();
+  });
+
+  it('shows "Open Instagram Profile" button for today\'s Instagram-enabled events', () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    mockUpcomingEvents = [
+      makeEvent({ id: 'today-ig', date: todayStr, instagramEnabled: true }),
+    ];
+    const { getByText } = render(<HomeScreen />);
+    expect(getByText(/Open Instagram Profile/i)).toBeTruthy();
   });
 
   it('shows WhatsApp badge when whatsappEnabled is true', () => {

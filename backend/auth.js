@@ -67,6 +67,15 @@ async function findUserById(id) {
   return users.get(id) ?? null;
 }
 
+async function getAllUsers() {
+  if (usePostgres()) {
+    const { getPool } = require('./db');
+    const { rows } = await getPool().query('SELECT data FROM users');
+    return rows.map(r => r.data);
+  }
+  return Array.from(users.values());
+}
+
 async function saveUser(user) {
   if (usePostgres()) {
     const { getPool } = require('./db');
@@ -246,6 +255,21 @@ router.patch('/profile', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/auth/push-token — save Expo push token for this user
+router.post('/push-token', requireAuth, async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'token is required' });
+    const updated = { ...req.user, expoPushToken: token };
+    await saveUser(updated);
+    console.log(`[Auth] Push token saved for user ${req.user.id}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Auth] push-token error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/auth/profile-photo — multipart upload
 router.post('/profile-photo', requireAuth, async (req, res) => {
   // TODO: Integrate with your file storage (S3, Cloudinary, etc.)
@@ -270,4 +294,4 @@ async function initUsersTable() {
   console.log('[DB] Users table ready.');
 }
 
-module.exports = { router, initUsersTable };
+module.exports = { router, initUsersTable, getAllUsers };

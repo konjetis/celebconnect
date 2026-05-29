@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CalendarEvent } from '../types';
-import { scheduleEventNotification, cancelEventNotification } from '../utils/notifications';
+import { scheduleEventNotification, cancelEventNotification, notifyTodayEventNow } from '../utils/notifications';
 import { syncEventToBackend, deleteEventFromBackend } from '../services/backendSync';
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -55,6 +55,10 @@ const EventContext = createContext<EventContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'celebconnect_events';
 
+function isToday(dateStr: string): boolean {
+  return dateStr === new Date().toISOString().split('T')[0];
+}
+
 export function EventProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(eventReducer, initialState);
 
@@ -89,6 +93,10 @@ export function EventProvider({ children }: { children: ReactNode }) {
     // Schedule local notification + sync to backend (both fire-and-forget)
     scheduleEventNotification(newEvent).catch(() => {});
     syncEventToBackend(newEvent).catch(() => {});
+    // If the event is today and scheduler already ran, fire notification immediately
+    if (isToday(newEvent.date) && newEvent.whatsappEnabled) {
+      notifyTodayEventNow(newEvent).catch(() => {});
+    }
   };
 
   const updateEvent = async (event: CalendarEvent) => {
@@ -100,6 +108,10 @@ export function EventProvider({ children }: { children: ReactNode }) {
     // Re-schedule notification with new details + sync to backend
     scheduleEventNotification(updated).catch(() => {});
     syncEventToBackend(updated).catch(() => {});
+    // If edited event is today and scheduler already ran, fire notification immediately
+    if (isToday(updated.date) && updated.whatsappEnabled) {
+      notifyTodayEventNow(updated).catch(() => {});
+    }
   };
 
   const deleteEvent = async (id: string) => {

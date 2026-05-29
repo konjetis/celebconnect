@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { Linking } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
@@ -35,10 +36,27 @@ export default function App() {
     // Fires when the user TAPS a notification (foreground or background)
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       response => {
-        const eventId = response.notification.request.content.data?.eventId as string | undefined;
-        if (eventId) {
-          // Navigate to Home tab — the event will be visible in "Today" or "Upcoming"
-          // The navigator ref is set up in AppNavigator; we use the global navigate helper
+        const data = response.notification.request.content.data as Record<string, string> | undefined;
+        const waPhone = data?.waPhone;
+        const message = data?.message;
+
+        if (waPhone && message) {
+          // Open WhatsApp with the contact's number and message pre-filled.
+          // The user taps Send once — the message comes from their personal number.
+          const encodedMessage = encodeURIComponent(message);
+          const cleanPhone     = waPhone.replace(/\D/g, '');
+          const url            = `whatsapp://send?phone=${cleanPhone}&text=${encodedMessage}`;
+          Linking.canOpenURL(url)
+            .then(supported => {
+              if (supported) return Linking.openURL(url);
+              // WhatsApp not installed — fall back to web.whatsapp.com
+              return Linking.openURL(
+                `https://wa.me/${cleanPhone}?text=${encodedMessage}`
+              );
+            })
+            .catch(err => console.error('Failed to open WhatsApp:', err));
+        } else if (data?.eventId) {
+          // Notification without WhatsApp data — just navigate to Home
           navigateToHome();
         }
       }

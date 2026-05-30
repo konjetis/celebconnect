@@ -29,7 +29,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
-  loginWithInstagram: (token: string, userId: string) => Promise<void>;
+  loginWithInstagram: (token: string) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
   forgotPassword: (identifier: string) => Promise<void>;
@@ -96,17 +96,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loginWithInstagram = async (instagramToken: string, instagramUserId: string) => {
-    const user: User = {
-      id: instagramUserId,
-      firstName: 'Instagram',
-      lastName: 'User',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    await SecureStore.setItemAsync('auth_token', instagramToken);
-    await SecureStore.setItemAsync('user_data', JSON.stringify(user));
-    dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token: instagramToken } });
+  // instagramToken is now a CelebConnect JWT (issued by our backend after verifying
+  // the Instagram OAuth flow). We fetch the real user profile from /api/auth/me.
+  const loginWithInstagram = async (celebConnectToken: string) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    try {
+      const user = await authService.validateToken(celebConnectToken);
+      await SecureStore.setItemAsync('auth_token', celebConnectToken);
+      await SecureStore.setItemAsync('user_data', JSON.stringify(user));
+      dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token: celebConnectToken } });
+      registerPushToken(celebConnectToken);
+    } catch {
+      dispatch({ type: 'SET_LOADING', payload: false });
+      throw new Error('Instagram login failed. Please try again.');
+    }
   };
 
   const register = async (credentials: RegisterCredentials) => {

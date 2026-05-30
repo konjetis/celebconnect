@@ -7,6 +7,8 @@ export interface User {
   firstName: string;
   lastName: string;
   profilePhoto?: string;
+  instagramId?: string;
+  instagramHandle?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,17 +1,21 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect } from 'react';
+import { NavigationContainer, createNavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, ActivityIndicator, View, StyleSheet } from 'react-native';
+import { Text, ActivityIndicator, View, StyleSheet, Alert } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
+import { registerResetPasswordNavigator, registerInstagramCallbackHandler } from './navRegistry';
 import { RootStackParamList, AuthStackParamList, MainTabParamList, CalendarStackParamList } from '../types';
 import { COLORS } from '../utils/theme';
+
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 // Screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import HomeScreen from '../screens/home/HomeScreen';
 import CalendarScreen from '../screens/calendar/CalendarScreen';
 import AddEditEventScreen from '../screens/calendar/AddEditEventScreen';
@@ -30,6 +34,7 @@ function AuthNavigator() {
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
       <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     </AuthStack.Navigator>
   );
 }
@@ -93,6 +98,25 @@ function MainNavigator() {
 export default function AppNavigator() {
   const { isLoading, isAuthenticated } = useAuth();
 
+  // Register deep-link callback for password-reset flow.
+  // Works even if the app is cold-started from the link — the handler
+  // queues the navigation until the container is ready.
+  useEffect(() => {
+    registerResetPasswordNavigator((token: string) => {
+      if (navigationRef.isReady()) {
+        navigationRef.dispatch(CommonActions.navigate('ResetPassword', { token }));
+      }
+    });
+
+    registerInstagramCallbackHandler(async (token: string) => {
+      try {
+        await loginWithInstagram(token);
+      } catch {
+        Alert.alert('Instagram Login Failed', 'Could not complete sign-in. Please try again.');
+      }
+    });
+  }, [loginWithInstagram]);
+
   if (isLoading) {
     return (
       <View style={styles.loading}>
@@ -103,7 +127,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           <RootStack.Screen name="Main" component={MainNavigator} />

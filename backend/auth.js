@@ -34,6 +34,34 @@ function requireJwt() {
 
 const users = new Map(); // id → user record (includes passwordHash)
 
+// ─── Password reset token store ───────────────────────────────────────────────
+// Maps token → { userId, expiresAt }
+// In-memory is fine — tokens are short-lived (1 hr) and non-critical to persist.
+
+const resetTokens = new Map();
+
+function generateResetToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function storeResetToken(userId) {
+  const token     = generateResetToken();
+  const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
+  resetTokens.set(token, { userId, expiresAt });
+  return token;
+}
+
+function consumeResetToken(token) {
+  const entry = resetTokens.get(token);
+  if (!entry) return null;
+  resetTokens.delete(token); // one-time use
+  if (Date.now() > entry.expiresAt) return null; // expired
+  return entry.userId;
+}
+
+// Expose for tests
+function _resetTokenStore() { return resetTokens; }
+
 function usePostgres() {
   return !!process.env.DATABASE_URL;
 }
@@ -217,15 +245,46 @@ router.post('/forgot-password', async (req, res) => {
 
     // Always return 200 to prevent account enumeration
     const user = await findUserByIdentifier(identifier);
-    if (user) {
-      // TODO: Send reset email/SMS via your email/SMS provider
-      // Example: await sendResetEmail(user.email, resetToken);
-      console.log(`[Auth] Password reset requested for: ${identifier}`);
+    if (user && user.email) {
+      const token = storeResetToken(user.id);
+      const { sendResetEmail } = require('./email');
+      await sendResetEmail(user.email, token);
     }
 
     res.json({ ok: true, message: 'If that account exists, a reset link has been sent.' });
   } catch (err) {
     console.error('[Auth] forgot-password error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ error: 'token and password are required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const userId = consumeResetToken(token);
+    if (!userId) {
+      return res.status(400).json({ error: 'Reset link is invalid or has expired' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) return res.status(400).json({ error: 'User not found' });
+
+    const bcrypt = requireBcrypt();
+    const passwordHash = await bcrypt.hash(password, 12);
+    await saveUser({ ...user, passwordHash, updatedAt: new Date().toISOString() });
+
+    console.log(`[Auth] Password reset successful for user ${userId}`);
+    res.json({ ok: true, message: 'Password updated successfully. You can now log in.' });
+  } catch (err) {
+    console.error('[Auth] reset-password error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -270,15 +329,63 @@ router.post('/push-token', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/auth/profile-photo — multipart upload
-router.post('/profile-photo', requireAuth, async (req, res) => {
-  // TODO: Integrate with your file storage (S3, Cloudinary, etc.)
-  // For now return a placeholder response so the client doesn't crash.
-  res.status(501).json({
-    error: 'Profile photo upload not yet configured on this server.',
-    hint: 'Integrate with Cloudinary or S3 and update backend/auth.js /profile-photo route.',
+// POST /api/auth/profile-photo — multipart upload → Cloudinary
+//
+// Requires these env vars (set in Railway dashboard):
+//   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+//
+// Client sends:  multipart/form-data  with field name "photo"
+// Response:      { ok: true, url: "https://res.cloudinary.com/..." }
+{
+  const multer     = require('multer');
+  const cloudinary = require('cloudinary').v2;
+  const upload     = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+  router.post('/profile-photo', requireAuth, upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No photo file provided (field name: "photo")' });
+      }
+
+      // Graceful error if Cloudinary is not yet configured.
+      if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+        return res.status(503).json({
+          error: 'Profile photo upload not configured.',
+          hint:  'Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in Railway environment.',
+        });
+      }
+
+      cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key:    process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+      });
+
+      // Upload buffer via upload_stream
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder:         'celebconnect/avatars',
+            public_id:      `user_${req.user.id}`,
+            overwrite:      true,
+            transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }],
+          },
+          (error, result) => { if (error) reject(error); else resolve(result); }
+        );
+        stream.end(req.file.buffer);
+      });
+
+      const url = uploadResult.secure_url;
+      await saveUser({ ...req.user, profilePhoto: url, updatedAt: new Date().toISOString() });
+
+      console.log(`[Auth] Profile photo updated for user ${req.user.id}: ${url}`);
+      res.json({ ok: true, url });
+    } catch (err) {
+      console.error('[Auth] profile-photo error:', err);
+      res.status(500).json({ error: err.message });
+    }
   });
-});
+}
 
 // ─── DB schema for users table ────────────────────────────────────────────────
 
@@ -294,4 +401,4 @@ async function initUsersTable() {
   console.log('[DB] Users table ready.');
 }
 
-module.exports = { router, initUsersTable, getAllUsers };
+module.exports = { router, initUsersTable, getAllUsers, _resetTokenStore, storeResetToken, consumeResetToken };

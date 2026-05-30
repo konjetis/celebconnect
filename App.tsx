@@ -7,6 +7,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { EventProvider } from './src/context/EventContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { requestNotificationPermissions } from './src/utils/notifications';
+import { navigateToHome, navigateToResetPassword, handleInstagramCallback } from './src/navigation/navRegistry';
 
 // ─── Error monitoring (Sentry) ────────────────────────────────────────────────
 // To enable:
@@ -23,6 +24,15 @@ export default function App() {
   const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
   useEffect(() => {
+    // Handle deep links (e.g. celebconnect://reset-password?token=...)
+    const handleDeepLink = ({ url }: { url: string }) => {
+      handleUrl(url);
+    };
+    // App already open — listen for incoming links
+    const linkSub = Linking.addEventListener('url', handleDeepLink);
+    // App cold-started from a link
+    Linking.getInitialURL().then(url => { if (url) handleUrl(url); }).catch(() => {});
+
     // Ask for notification permission on first launch
     requestNotificationPermissions().catch(() => {});
 
@@ -63,6 +73,7 @@ export default function App() {
     );
 
     return () => {
+      linkSub.remove();
       notificationListener.current?.remove();
       responseListener.current?.remove();
     };
@@ -81,15 +92,26 @@ export default function App() {
   );
 }
 
-// ─── Navigation helper ────────────────────────────────────────────────────────
-// AppNavigator exposes a navigationRef so we can navigate from outside React tree
+// ─── Deep link handler ────────────────────────────────────────────────────────
 
-let _navigateToHome: (() => void) | null = null;
-
-export function registerHomeNavigator(fn: () => void) {
-  _navigateToHome = fn;
-}
-
-function navigateToHome() {
-  _navigateToHome?.();
+function handleUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    switch (parsed.hostname) {
+      case 'reset-password': {
+        const token = parsed.searchParams.get('token');
+        if (token) navigateToResetPassword(token);
+        break;
+      }
+      case 'instagram-callback': {
+        const token = parsed.searchParams.get('token');
+        const error = parsed.searchParams.get('error');
+        if (token) handleInstagramCallback(token);
+        else if (error) console.warn('[DeepLink] Instagram login error:', error);
+        break;
+      }
+    }
+  } catch {
+    // ignore malformed URLs
+  }
 }

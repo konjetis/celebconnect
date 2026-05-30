@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, Alert, Image,
+  StyleSheet, ScrollView, Alert, Image, ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, SPACING } from '../../utils/theme';
 
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'https://celebconnect-production.up.railway.app';
+
 export default function AccountScreen() {
   const { user, updateUser, logout } = useAuth();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing]       = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [form, setForm] = useState({
     firstName: user?.firstName ?? '',
     lastName: user?.lastName ?? '',
@@ -53,26 +56,38 @@ export default function AccountScreen() {
       quality: 0.8,
     });
 
-    if (!result.canceled && user) {
-      try {
-        // Copy the photo to the app's permanent document directory so it
-        // persists across sessions (the temp URI from ImagePicker is wiped on reload).
-        const photoDir = ((FileSystem as any).documentDirectory as string ?? '') + 'photos/';
-        const dirInfo  = await FileSystem.getInfoAsync(photoDir);
-        if (!dirInfo.exists) {
-          await FileSystem.makeDirectoryAsync(photoDir, { intermediates: true });
-        }
+    if (result.canceled || !user) return;
 
-        const filename    = `profile_${user.id}.jpg`;
-        const destination = photoDir + filename;
-        await FileSystem.copyAsync({ from: result.assets[0].uri, to: destination });
+    const asset = result.assets[0];
+    setUploadingPhoto(true);
+    try {
+      const token = await SecureStore.getItemAsync('auth_token');
+      if (!token) throw new Error('Not authenticated');
 
-        updateUser({ ...user, profilePhoto: destination });
-      } catch (err) {
-        console.error('[AccountScreen] Failed to save profile photo:', err);
-        // Fallback: use the temp URI (works for the current session)
-        updateUser({ ...user, profilePhoto: result.assets[0].uri });
-      }
+      // Build multipart form
+      const formData = new FormData();
+      formData.append('photo', {
+        uri:  asset.uri,
+        name: 'photo.jpg',
+        type: 'image/jpeg',
+      } as any);
+
+      const res = await fetch(`${BACKEND_URL}/api/auth/profile-photo`, {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body:    formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Upload failed');
+
+      // Persist the Cloudinary URL on the user object
+      updateUser({ ...user, profilePhoto: data.url });
+    } catch (err: any) {
+      console.error('[AccountScreen] Photo upload error:', err);
+      Alert.alert('Upload failed', err.message ?? 'Could not upload photo. Please try again.');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -87,7 +102,7 @@ export default function AccountScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Avatar */}
       <View style={styles.avatarSection}>
-        <TouchableOpacity onPress={handlePickPhoto} style={styles.avatarWrapper}>
+        <TouchableOpacity onPress={handlePickPhoto} style={styles.avatarWrapper} disabled={uploadingPhoto}>
           {user?.profilePhoto ? (
             <Image source={{ uri: user.profilePhoto }} style={styles.avatar} />
           ) : (
@@ -97,7 +112,13 @@ export default function AccountScreen() {
               </Text>
             </View>
           )}
-          <View style={styles.cameraBtn}><Text>📷</Text></View>
+          {uploadingPhoto ? (
+            <View style={[styles.cameraBtn, styles.cameraBtnUploading]}>
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            </View>
+          ) : (
+            <View style={styles.cameraBtn}><Text>📷</Text></View>
+          )}
         </TouchableOpacity>
         <Text style={styles.userName}>{user?.firstName} {user?.lastName}</Text>
         <Text style={styles.userContact}>{user?.email || user?.phone}</Text>
@@ -184,6 +205,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 16, padding: 4,
     borderWidth: 2, borderColor: COLORS.border,
   },
+  cameraBtnUploading: { padding: 6 },
   userName: { fontSize: 22, fontWeight: '800', color: COLORS.text },
   userContact: { fontSize: 14, color: COLORS.textSecondary, marginTop: 4 },
   card: {

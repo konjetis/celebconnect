@@ -173,3 +173,104 @@ describe('POST /api/auth/push-token', () => {
     expect(res.status).toBe(400);
   });
 });
+
+// ─── Password Reset ───────────────────────────────────────────────────────────
+
+describe('POST /api/auth/forgot-password', () => {
+  it('returns 200 for a known email (prevents account enumeration)', async () => {
+    const app   = buildApp();
+    const email = uniqueEmail();
+    await request(app).post('/api/auth/register').send({
+      firstName: 'Forgot', lastName: 'User', email, password: 'secret', method: 'email',
+    });
+    const res = await request(app).post('/api/auth/forgot-password').send({ identifier: email });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+
+  it('returns 200 even for an unknown email (prevents account enumeration)', async () => {
+    const app = buildApp();
+    const res = await request(app).post('/api/auth/forgot-password').send({ identifier: 'nobody@unknown.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+
+  it('returns 400 when identifier is missing', async () => {
+    const app = buildApp();
+    const res = await request(app).post('/api/auth/forgot-password').send({});
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/auth/reset-password', () => {
+  const { storeResetToken } = require('../auth');
+
+  async function registerUser() {
+    const app   = buildApp();
+    const email = uniqueEmail();
+    const reg   = await request(app).post('/api/auth/register').send({
+      firstName: 'Reset', lastName: 'Tester', email, password: 'oldpassword', method: 'email',
+    });
+    return { app, email, userId: reg.body.user.id };
+  }
+
+  it('resets the password with a valid token', async () => {
+    const { app, email, userId } = await registerUser();
+    const token = storeResetToken(userId);
+
+    const res = await request(app).post('/api/auth/reset-password').send({ token, password: 'newpassword1' });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+
+    // Can now log in with the new password
+    const loginRes = await request(app).post('/api/auth/login').send({ identifier: email, password: 'newpassword1' });
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.token).toBeDefined();
+  });
+
+  it('rejects an invalid / unknown token', async () => {
+    const { app } = await registerUser();
+    const res = await request(app).post('/api/auth/reset-password').send({ token: 'badbadtoken', password: 'newpassword1' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a token that has already been used (one-time use)', async () => {
+    const { app, userId } = await registerUser();
+    const token = storeResetToken(userId);
+
+    // First use — succeeds
+    await request(app).post('/api/auth/reset-password').send({ token, password: 'firstnewpass' });
+
+    // Second use — should fail
+    const res = await request(app).post('/api/auth/reset-password').send({ token, password: 'secondnewpass' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a password shorter than 8 characters', async () => {
+    const { app, userId } = await registerUser();
+    const token = storeResetToken(userId);
+
+    const res = await request(app).post('/api/auth/reset-password').send({ token, password: 'short' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/8 characters/i);
+  });
+
+  it('returns 400 when token or password is missing', async () => {
+    const app = buildApp();
+    const noToken = await request(app).post('/api/auth/reset-password').send({ password: 'newpassword1' });
+    expect(noToken.status).toBe(400);
+
+    const noPassword = await request(app).post('/api/auth/reset-password').send({ token: 'sometoken' });
+    expect(noPassword.status).toBe(400);
+  });
+
+  it('old password no longer works after reset', async () => {
+    const { app, email, userId } = await registerUser();
+    const token = storeResetToken(userId);
+
+    await request(app).post('/api/auth/reset-password').send({ token, password: 'brandnewpass' });
+
+    const loginOld = await request(app).post('/api/auth/login').send({ identifier: email, password: 'oldpassword' });
+    expect(loginOld.status).toBe(401);
+  });
+});

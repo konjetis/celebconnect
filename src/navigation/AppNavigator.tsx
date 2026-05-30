@@ -96,7 +96,7 @@ function MainNavigator() {
 // ─── Root Navigator ───────────────────────────────────────────────────────────
 
 export default function AppNavigator() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, loginWithInstagram } = useAuth();
 
   // Register deep-link callback for password-reset flow.
   // Works even if the app is cold-started from the link — the handler

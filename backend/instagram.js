@@ -35,8 +35,9 @@ router.post('/webhook', (req, res) => {
 router.get('/auth/instagram', (req, res) => {
   const appId       = process.env.INSTAGRAM_APP_ID;
   const redirectUri = 'https://celebconnect-production.up.railway.app/api/auth/instagram/callback';
-  const scope       = 'user_profile,user_media';
-  const url         = `https://api.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+  // New Instagram Business API uses instagram.com/oauth/authorize + instagram_business_basic scope
+  const scope       = 'instagram_business_basic';
+  const url         = `https://www.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
   res.redirect(url);
 });
 
@@ -72,12 +73,12 @@ router.get('/auth/instagram/callback', async (req, res) => {
 
     const { access_token, user_id } = tokenRes.data;
 
-    // 2. Fetch real Instagram profile
+    // 2. Fetch real Instagram profile (new API uses /me endpoint)
     const profileRes = await axios.get(
-      `https://graph.instagram.com/${user_id}`,
-      { params: { fields: 'id,username', access_token } }
+      'https://graph.instagram.com/me',
+      { params: { fields: 'id,username,name', access_token } }
     );
-    const { username } = profileRes.data;
+    const { username, name } = profileRes.data;
 
     // 3. Find or create a CelebConnect user for this Instagram account
     const { getAllUsers, saveUser: _saveUser } = require('./auth');
@@ -91,10 +92,11 @@ router.get('/auth/instagram/callback', async (req, res) => {
     if (!user) {
       // New Instagram user — create a CelebConnect account
       const now = new Date().toISOString();
+      const nameParts = (name || username || '').split(' ');
       user = {
         id:          crypto.randomUUID(),
-        firstName:   username,
-        lastName:    '',
+        firstName:   nameParts[0] || username,
+        lastName:    nameParts.slice(1).join(' ') || '',
         instagramId: String(user_id),
         instagramHandle: username,
         profilePhoto: undefined,

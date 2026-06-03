@@ -4,6 +4,7 @@ import {
   StyleSheet, ScrollView, Switch, Alert,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
+import ContactPickerModal from '../../components/ContactPickerModal';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { CalendarStackParamList, CalendarEvent, EventCategory, RecurrenceType, EventContact } from '../../types';
@@ -60,6 +61,7 @@ export default function AddEditEventScreen({ navigation, route }: Props) {
   const [newContactName, setNewContactName] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
   const [newContactIsGroup, setNewContactIsGroup] = useState(false);
+  const [showContactPicker, setShowContactPicker] = useState(false);
 
   const addContact = () => {
     if (!newContactName.trim()) return Alert.alert('Error', 'Please enter a name.');
@@ -262,25 +264,55 @@ export default function AddEditEventScreen({ navigation, route }: Props) {
                   <Text style={[styles.typeBtnText, newContactIsGroup && styles.typeBtnTextActive]}>👥 Group</Text>
                 </TouchableOpacity>
               </View>
-              <TextInput
-                style={[styles.input, { marginTop: SPACING.sm }]}
-                value={newContactName}
-                onChangeText={setNewContactName}
-                placeholder={newContactIsGroup ? 'Group name' : 'Contact name'}
-              />
-              {!newContactIsGroup && (
+
+              {!newContactIsGroup ? (
+                <>
+                  {/* Search from phone contacts */}
+                  <TouchableOpacity
+                    style={styles.searchContactBtn}
+                    onPress={() => setShowContactPicker(true)}
+                  >
+                    <Text style={styles.searchContactBtnText}>🔍 Search Phone Contacts</Text>
+                  </TouchableOpacity>
+
+                  {/* Or type manually */}
+                  <Text style={styles.orLabel}>— or enter manually —</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={newContactName}
+                    onChangeText={setNewContactName}
+                    placeholder="Contact name"
+                  />
+                  <TextInput
+                    style={[styles.input, { marginTop: SPACING.sm }]}
+                    value={newContactPhone}
+                    onChangeText={setNewContactPhone}
+                    placeholder="+1 234 567 8900"
+                    keyboardType="phone-pad"
+                  />
+                </>
+              ) : (
                 <TextInput
                   style={[styles.input, { marginTop: SPACING.sm }]}
-                  value={newContactPhone}
-                  onChangeText={setNewContactPhone}
-                  placeholder="+1 234 567 8900"
-                  keyboardType="phone-pad"
+                  value={newContactName}
+                  onChangeText={setNewContactName}
+                  placeholder="WhatsApp group name"
                 />
               )}
+
               <TouchableOpacity style={styles.addContactBtn} onPress={addContact}>
                 <Text style={styles.addContactBtnText}>+ Add Recipient</Text>
               </TouchableOpacity>
             </View>
+
+            <ContactPickerModal
+              visible={showContactPicker}
+              onSelect={({ name, phone }) => {
+                setNewContactName(name);
+                setNewContactPhone(phone);
+              }}
+              onClose={() => setShowContactPicker(false)}
+            />
           </>
         )}
       </View>
@@ -415,4 +447,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary,
   },
   addContactBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
+  searchContactBtn: {
+    backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 12,
+    alignItems: 'center', marginTop: SPACING.sm,
+    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25, shadowRadius: 4, elevation: 3,
+  },
+  searchContactBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  orLabel: {
+    textAlign: 'center', color: COLORS.textSecondary, fontSize: 12,
+    marginVertical: SPACING.sm,
+  },
 });

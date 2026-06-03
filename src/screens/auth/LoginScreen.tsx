@@ -20,7 +20,7 @@ type Props = {
 };
 
 export default function LoginScreen({ navigation }: Props) {
-  const { login, isLoading } = useAuth();
+  const { login, loginWithInstagram, isLoading } = useAuth();
   const [method, setMethod]       = useState<LoginMethod>('email');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword]   = useState('');
@@ -41,19 +41,24 @@ export default function LoginScreen({ navigation }: Props) {
   const handleInstagramLogin = async () => {
     setIgLoading(true);
     try {
-      // Open the backend OAuth start endpoint in an in-app browser.
-      // The backend redirects to Instagram → user approves → backend issues
-      // a CelebConnect JWT → deep-links back to celebconnect://instagram-callback?token=...
-      // App.tsx catches that deep link and calls loginWithInstagram(token).
+      // openAuthSessionAsync on iOS returns the redirect URL directly in result.url —
+      // the Linking event does NOT fire because ASWebAuthenticationSession intercepts it.
       const result = await WebBrowser.openAuthSessionAsync(
         `${BACKEND_URL}/api/instagram`,
         'celebconnect://instagram-callback'
       );
 
-      if (result.type === 'cancel' || result.type === 'dismiss') {
-        // User closed the browser — nothing to do
+      if (result.type === 'success' && result.url) {
+        const parsed = new URL(result.url);
+        const token = parsed.searchParams.get('token');
+        const error = parsed.searchParams.get('error');
+        if (token) {
+          await loginWithInstagram(token);
+        } else if (error) {
+          Alert.alert('Instagram Login Failed', 'Could not complete sign-in. Please try again.');
+        }
       }
-      // On success the deep link is handled by App.tsx → navRegistry → AppNavigator
+      // type === 'cancel' or 'dismiss' means user closed the browser — nothing to do
     } catch (err: any) {
       Alert.alert('Instagram Login Error', err.message ?? 'Something went wrong.');
     } finally {

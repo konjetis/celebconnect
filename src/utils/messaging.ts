@@ -43,12 +43,22 @@ export async function openWhatsApp(
   }
 }
 
+export type GroupSendPayload = {
+  contacts: EventContact[];
+  template: string;
+};
+
 /**
  * Sends WhatsApp messages to all contacts on an event.
- * - One contact  → opens WhatsApp immediately
- * - Many contacts → shows a pick-list so the user taps each one
+ * - No contacts  → shows an alert
+ * - One contact  → opens WhatsApp immediately, returns null
+ * - Many contacts → returns a GroupSendPayload so the caller can show GroupSendModal,
+ *                   OR shows a picker with a "Send to All" option
  */
-export function sendWhatsAppMessages(event: CalendarEvent): void {
+export function sendWhatsAppMessages(
+  event: CalendarEvent,
+  onGroupSend?: (payload: GroupSendPayload) => void
+): void {
   const contacts = event.contacts.filter(c => !c.instagramHandle);
 
   // No recipients added — tell the user clearly
@@ -69,13 +79,17 @@ export function sendWhatsAppMessages(event: CalendarEvent): void {
     return;
   }
 
-  // Multiple contacts — show picker
+  // Multiple contacts — offer "Send to All" + individual options
   Alert.alert(
     '💬 Send WhatsApp Message',
-    `Message: "${template.substring(0, 60)}${template.length > 60 ? '...' : ''}"\n\nTap a recipient:`,
+    `${contacts.length} recipients · "${template.substring(0, 50)}${template.length > 50 ? '...' : ''}"`,
     [
+      {
+        text: `🚀 Send to All (${contacts.length})`,
+        onPress: () => onGroupSend?.({ contacts, template }),
+      },
       ...contacts.map(c => ({
-        text: c.isWhatsAppGroup ? `👥 ${c.name}` : `👤 ${c.name} ${c.phone ? `(${c.phone})` : ''}`,
+        text: c.isWhatsAppGroup ? `👥 ${c.name}` : `👤 ${c.name}`,
         onPress: () => openWhatsApp(c, template),
       })),
       { text: 'Cancel', style: 'cancel' as const },

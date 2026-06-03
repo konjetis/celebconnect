@@ -9,7 +9,8 @@ import { CalendarStackParamList, CalendarEvent } from '../../types';
 import { useEvents } from '../../context/EventContext';
 import { COLORS, SPACING } from '../../utils/theme';
 import { getCategoryEmoji, formatDate } from '../../utils/helpers';
-import { sendWhatsAppMessages, openInstagramAccounts } from '../../utils/messaging';
+import { sendWhatsAppMessages, openInstagramAccounts, GroupSendPayload } from '../../utils/messaging';
+import GroupSendModal from '../../components/GroupSendModal';
 
 type Props = {
   navigation: NativeStackNavigationProp<CalendarStackParamList, 'CalendarMain'>;
@@ -17,6 +18,7 @@ type Props = {
 
 export default function CalendarScreen({ navigation }: Props) {
   const { events, loadEvents, deleteEvent } = useEvents();
+  const [groupSend, setGroupSend] = useState<GroupSendPayload | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -62,7 +64,7 @@ export default function CalendarScreen({ navigation }: Props) {
             {item.whatsappEnabled && (
               <TouchableOpacity
                 style={[styles.sendBtn, isItemToday && styles.sendBtnToday]}
-                onPress={() => sendWhatsAppMessages(item)}
+                onPress={() => sendWhatsAppMessages(item, setGroupSend)}
                 activeOpacity={0.8}
               >
                 <Text style={styles.sendBtnText}>
@@ -150,6 +152,13 @@ export default function CalendarScreen({ navigation }: Props) {
           }
         />
       </View>
+
+      <GroupSendModal
+        visible={!!groupSend}
+        contacts={groupSend?.contacts ?? []}
+        messageTemplate={groupSend?.template ?? ''}
+        onClose={() => setGroupSend(null)}
+      />
     </View>
   );
 }

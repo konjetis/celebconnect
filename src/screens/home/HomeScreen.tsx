@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, FlatList, Alert,
@@ -8,11 +8,13 @@ import { useEvents } from '../../context/EventContext';
 import { CalendarEvent } from '../../types';
 import { COLORS, SPACING } from '../../utils/theme';
 import { formatDate, daysUntil, getCategoryEmoji } from '../../utils/helpers';
-import { sendWhatsAppMessages, openInstagramAccounts } from '../../utils/messaging';
+import { sendWhatsAppMessages, openInstagramAccounts, GroupSendPayload } from '../../utils/messaging';
+import GroupSendModal from '../../components/GroupSendModal';
 
 export default function HomeScreen() {
   const { user } = useAuth();
   const { loadEvents, getUpcomingEvents, deleteEvent } = useEvents();
+  const [groupSend, setGroupSend] = useState<GroupSendPayload | null>(null);
 
   const handleDelete = (event: CalendarEvent) => {
     Alert.alert('Delete Event', `Delete "${event.title}"?`, [
@@ -37,7 +39,7 @@ export default function HomeScreen() {
           <Text style={styles.eventDate}>{formatDate(item.date)}</Text>
           <View style={styles.integrationRow}>
             {item.whatsappEnabled && (
-              <TouchableOpacity onPress={() => sendWhatsAppMessages(item)}>
+              <TouchableOpacity onPress={() => sendWhatsAppMessages(item, setGroupSend)}>
                 <Text style={styles.integrationBadge}>💬 WhatsApp</Text>
               </TouchableOpacity>
             )}
@@ -52,7 +54,7 @@ export default function HomeScreen() {
               {item.whatsappEnabled && (
                 <TouchableOpacity
                   style={styles.sendBtn}
-                  onPress={() => sendWhatsAppMessages(item)}
+                  onPress={() => sendWhatsAppMessages(item, setGroupSend)}
                 >
                   <Text style={styles.sendBtnText}>💬 Send Message</Text>
                 </TouchableOpacity>
@@ -107,7 +109,7 @@ export default function HomeScreen() {
                 {event.whatsappEnabled && (
                   <TouchableOpacity
                     style={styles.sendNowBtn}
-                    onPress={() => sendWhatsAppMessages(event)}
+                    onPress={() => sendWhatsAppMessages(event, setGroupSend)}
                     activeOpacity={0.8}
                   >
                     <Text style={styles.sendNowBtnText}>🚀 Send Now via WhatsApp</Text>
@@ -158,6 +160,13 @@ export default function HomeScreen() {
         <StatCard emoji="💍" label="Anniversaries" count={upcomingEvents.filter(e => e.category === 'anniversary').length} />
         <StatCard emoji="💬" label="Auto-messages" count={upcomingEvents.filter(e => e.whatsappEnabled || e.instagramEnabled).length} />
       </View>
+
+      <GroupSendModal
+        visible={!!groupSend}
+        contacts={groupSend?.contacts ?? []}
+        messageTemplate={groupSend?.template ?? ''}
+        onClose={() => setGroupSend(null)}
+      />
     </ScrollView>
   );
 }

@@ -106,9 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await SecureStore.setItemAsync('user_data', JSON.stringify(user));
       dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token: celebConnectToken } });
       registerPushToken(celebConnectToken);
-    } catch {
+    } catch (err: any) {
       dispatch({ type: 'SET_LOADING', payload: false });
-      throw new Error('Instagram login failed. Please try again.');
+      throw new Error(err?.message ?? 'Instagram login failed. Please try again.');
     }
   };
 

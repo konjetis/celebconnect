@@ -49,13 +49,18 @@ export default function LoginScreen({ navigation }: Props) {
       );
 
       if (result.type === 'success' && result.url) {
-        const parsed = new URL(result.url);
-        const token = parsed.searchParams.get('token');
-        const error = parsed.searchParams.get('error');
+        // Use regex to extract token — more reliable than new URL() with custom schemes in RN
+        const tokenMatch = result.url.match(/[?&]token=([^&]+)/);
+        const errorMatch = result.url.match(/[?&]error=([^&]+)/);
+        const token = tokenMatch?.[1];
+        const igError = errorMatch?.[1];
+
         if (token) {
           await loginWithInstagram(token);
-        } else if (error) {
-          Alert.alert('Instagram Login Failed', 'Could not complete sign-in. Please try again.');
+        } else if (igError) {
+          Alert.alert('Instagram Login Failed', `Error: ${igError}. Please try again.`);
+        } else {
+          Alert.alert('Instagram Login Failed', `Unexpected response: ${result.url}`);
         }
       }
       // type === 'cancel' or 'dismiss' means user closed the browser — nothing to do

@@ -31,10 +31,10 @@ router.post('/webhook', (req, res) => {
 });
 
 // ─── OAuth Start ──────────────────────────────────────────────────────────────
-// GET /api/auth/instagram — redirect browser to Instagram authorization page
-router.get('/auth/instagram', (req, res) => {
+// GET /api/instagram — redirect browser to Instagram authorization page
+router.get('/', (req, res) => {
   const appId       = process.env.INSTAGRAM_APP_ID;
-  const redirectUri = 'https://celebconnect-production.up.railway.app/api/auth/instagram/callback';
+  const redirectUri = 'https://celebconnect-production.up.railway.app/api/instagram/callback';
   // New Instagram Business API uses instagram.com/oauth/authorize + instagram_business_basic scope
   const scope       = 'instagram_business_basic';
   const url         = `https://www.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
@@ -42,9 +42,9 @@ router.get('/auth/instagram', (req, res) => {
 });
 
 // ─── OAuth Callback ───────────────────────────────────────────────────────────
-// GET /api/auth/instagram/callback — exchange code for token, fetch profile,
+// GET /api/instagram/callback — exchange code for token, fetch profile,
 // find-or-create CelebConnect user, issue our own JWT, deep-link back to app.
-router.get('/auth/instagram/callback', async (req, res) => {
+router.get('/callback', async (req, res) => {
   const { code, error: igError } = req.query;
 
   if (igError) {
@@ -61,7 +61,7 @@ router.get('/auth/instagram/callback', async (req, res) => {
       client_id:     process.env.INSTAGRAM_APP_ID,
       client_secret: process.env.INSTAGRAM_APP_SECRET,
       grant_type:    'authorization_code',
-      redirect_uri:  'https://celebconnect-production.up.railway.app/api/auth/instagram/callback',
+      redirect_uri:  'https://celebconnect-production.up.railway.app/api/instagram/callback',
       code,
     });
 

@@ -46,7 +46,7 @@ export default function LoginScreen({ navigation }: Props) {
       // a CelebConnect JWT → deep-links back to celebconnect://instagram-callback?token=...
       // App.tsx catches that deep link and calls loginWithInstagram(token).
       const result = await WebBrowser.openAuthSessionAsync(
-        `${BACKEND_URL}/api/auth/instagram`,
+        `${BACKEND_URL}/api/instagram`,
         'celebconnect://instagram-callback'
       );
 

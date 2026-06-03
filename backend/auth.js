@@ -245,10 +245,17 @@ router.post('/forgot-password', async (req, res) => {
 
     // Always return 200 to prevent account enumeration
     const user = await findUserByIdentifier(identifier);
-    if (user && user.email) {
+    if (user) {
       const token = storeResetToken(user.id);
-      const { sendResetEmail } = require('./email');
-      await sendResetEmail(user.email, token);
+      if (user.email) {
+        // Email-registered account — send reset link by email
+        const { sendResetEmail } = require('./email');
+        await sendResetEmail(user.email, token);
+      } else if (user.phone) {
+        // Phone-registered account — send reset link by SMS
+        const { sendResetSms } = require('./sms');
+        await sendResetSms(user.phone, token);
+      }
     }
 
     res.json({ ok: true, message: 'If that account exists, a reset link has been sent.' });

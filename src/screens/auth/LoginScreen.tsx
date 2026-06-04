@@ -49,14 +49,17 @@ export default function LoginScreen({ navigation }: Props) {
       );
 
       if (result.type === 'success' && result.url) {
-        // Use regex to extract token — more reliable than new URL() with custom schemes in RN
-        const tokenMatch = result.url.match(/[?&]token=([^&]+)/);
+        const codeMatch  = result.url.match(/[?&]code=([^&]+)/);
         const errorMatch = result.url.match(/[?&]error=([^&]+)/);
-        const token = tokenMatch?.[1];
+        const code    = codeMatch?.[1];
         const igError = errorMatch?.[1];
 
-        if (token) {
-          await loginWithInstagram(token);
+        if (code) {
+          // Exchange the short-lived code for { token, user } — avoids JWT-in-URL issues
+          const resp = await fetch(`${BACKEND_URL}/api/instagram/exchange?code=${code}`);
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error ?? 'Code exchange failed');
+          await loginWithInstagram(data.token, data.user);
         } else if (igError) {
           Alert.alert('Instagram Login Failed', `Error: ${igError}. Please try again.`);
         } else {

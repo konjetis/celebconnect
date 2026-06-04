@@ -29,7 +29,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
-  loginWithInstagram: (token: string) => Promise<void>;
+  loginWithInstagram: (token: string, user: User) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
   forgotPassword: (identifier: string) => Promise<void>;
@@ -96,12 +96,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // instagramToken is now a CelebConnect JWT (issued by our backend after verifying
-  // the Instagram OAuth flow). We fetch the real user profile from /api/auth/me.
-  const loginWithInstagram = async (celebConnectToken: string) => {
+  // User and token come directly from the backend code-exchange endpoint —
+  // no second round trip needed, no JWT-in-URL encoding issues.
+  const loginWithInstagram = async (celebConnectToken: string, user: User) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const user = await authService.validateToken(celebConnectToken);
       await SecureStore.setItemAsync('auth_token', celebConnectToken);
       await SecureStore.setItemAsync('user_data', JSON.stringify(user));
       dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token: celebConnectToken } });

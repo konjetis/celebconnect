@@ -2,7 +2,28 @@
 
 const express = require('express');
 const axios   = require('axios');
+const crypto  = require('crypto');
 const router  = express.Router();
+
+// ─── Short-lived login code store ────────────────────────────────────────────
+// Avoids putting a full JWT in the redirect URL (encoding issues on iOS).
+// code → { token, user, expiresAt }
+const pendingLogins = new Map();
+
+function storeLoginCode(token, user) {
+  const code      = crypto.randomBytes(24).toString('hex');
+  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+  pendingLogins.set(code, { token, user, expiresAt });
+  return code;
+}
+
+// Purge expired codes to avoid memory leaks
+function purgeExpired() {
+  const now = Date.now();
+  for (const [k, v] of pendingLogins) {
+    if (v.expiresAt < now) pendingLogins.delete(k);
+  }
+}
 
 // ─── Webhook Verification (GET) ───────────────────────────────────────────────
 router.get('/webhook', (req, res) => {
@@ -120,14 +141,40 @@ router.get('/callback', async (req, res) => {
     const JWT_SECRET = process.env.AUTH_JWT_SECRET ?? 'REPLACE_WITH_A_LONG_RANDOM_SECRET';
     const ourToken   = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '30d' });
 
+    // Strip passwordHash before storing user in memory
+    const { passwordHash: _pw, ...safeUser } = user;
+
+    // 5. Store token+user under a short code; redirect with just the code.
+    //    This avoids putting a full JWT in the URL (iOS encoding issues).
+    purgeExpired();
+    const loginCode = storeLoginCode(ourToken, safeUser);
+
     console.log(`[Instagram] Login success for @${username} (user ${user.id})`);
 
-    // 5. Deep-link back to the app with our JWT
-    res.redirect(`celebconnect://instagram-callback?token=${ourToken}`);
+    res.redirect(`celebconnect://instagram-callback?code=${loginCode}`);
   } catch (err) {
     console.error('[Instagram] OAuth error:', err.response?.data || err.message);
     res.redirect('celebconnect://instagram-callback?error=server_error');
   }
+});
+
+// ─── Code Exchange ────────────────────────────────────────────────────────────
+// GET /api/instagram/exchange?code=<loginCode>
+// App calls this after receiving the code from the deep link.
+// Returns { token, user } and consumes the code (one-time use).
+router.get('/exchange', (req, res) => {
+  const { code } = req.query;
+  if (!code) return res.status(400).json({ error: 'code is required' });
+
+  const entry = pendingLogins.get(code);
+  if (!entry) return res.status(400).json({ error: 'Invalid or expired login code' });
+  if (entry.expiresAt < Date.now()) {
+    pendingLogins.delete(code);
+    return res.status(400).json({ error: 'Login code expired' });
+  }
+
+  pendingLogins.delete(code); // one-time use
+  res.json({ token: entry.token, user: entry.user });
 });
 
 module.exports = router;

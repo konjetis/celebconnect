@@ -5,11 +5,13 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import ContactPickerModal from '../../components/ContactPickerModal';
+import GroupPickerModal from '../../components/GroupPickerModal';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { CalendarStackParamList, CalendarEvent, EventCategory, RecurrenceType, EventContact } from '../../types';
 import { useEvents } from '../../context/EventContext';
 import { COLORS, SPACING } from '../../utils/theme';
+import { saveGroup } from '../../services/savedGroupsService';
 
 type AddProps = {
   navigation: NativeStackNavigationProp<CalendarStackParamList, 'AddEvent'>;
@@ -62,6 +64,7 @@ export default function AddEditEventScreen({ navigation, route }: Props) {
   const [newContactPhone, setNewContactPhone] = useState('');
   const [newContactIsGroup, setNewContactIsGroup] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
 
   const addContact = () => {
     if (!newContactName.trim()) return Alert.alert('Error', 'Please enter a name.');
@@ -73,6 +76,10 @@ export default function AddEditEventScreen({ navigation, route }: Props) {
       isWhatsAppGroup: newContactIsGroup,
     };
     setContacts(prev => [...prev, contact]);
+    // Remember group names typed manually so they're searchable next time
+    if (newContactIsGroup) {
+      saveGroup(contact.name).catch(() => {});
+    }
     setNewContactName('');
     setNewContactPhone('');
     setNewContactIsGroup(false);
@@ -292,12 +299,23 @@ export default function AddEditEventScreen({ navigation, route }: Props) {
                   />
                 </>
               ) : (
-                <TextInput
-                  style={[styles.input, { marginTop: SPACING.sm }]}
-                  value={newContactName}
-                  onChangeText={setNewContactName}
-                  placeholder="WhatsApp group name"
-                />
+                <>
+                  {/* Search saved groups */}
+                  <TouchableOpacity
+                    style={styles.searchContactBtn}
+                    onPress={() => setShowGroupPicker(true)}
+                  >
+                    <Text style={styles.searchContactBtnText}>🔍 Search Saved Groups</Text>
+                  </TouchableOpacity>
+
+                  <Text style={styles.orLabel}>— or enter manually —</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={newContactName}
+                    onChangeText={setNewContactName}
+                    placeholder="WhatsApp group name"
+                  />
+                </>
               )}
 
               <TouchableOpacity style={styles.addContactBtn} onPress={addContact}>
@@ -312,6 +330,12 @@ export default function AddEditEventScreen({ navigation, route }: Props) {
                 setNewContactPhone(phone);
               }}
               onClose={() => setShowContactPicker(false)}
+            />
+
+            <GroupPickerModal
+              visible={showGroupPicker}
+              onSelect={(name) => setNewContactName(name)}
+              onClose={() => setShowGroupPicker(false)}
             />
           </>
         )}

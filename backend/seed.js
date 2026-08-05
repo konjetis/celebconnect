@@ -122,6 +122,24 @@ const TEST_EVENTS = [
     notes:           '',
     userId:          'user-seed-002',
   },
+  {
+    // Dated TODAY on purpose. The App Store / Play reviewer signs in as
+    // reviewer@celebconnect.app and needs an event they can immediately tap
+    // "Send Now via WhatsApp" on. See APP_STORE_METADATA.md → Review Notes.
+    id:              'evt-seed-006',
+    title:           "Sister's Birthday",
+    date:            daysFromToday(0),
+    recurrence:      'yearly',
+    type:            'birthday',
+    whatsappEnabled: true,
+    whatsappMessage: 'Happy Birthday {name}! 🎂 Hope you have the best day!',
+    contacts: [
+      { name: 'Anjali', phone: '+10000000005' },
+    ],
+    reminderDays:    1,
+    notes:           'Demo event for store review — always dated today.',
+    userId:          'user-seed-002',
+  },
 ];
 
 // ─── Seed functions ───────────────────────────────────────────────────────────
@@ -136,12 +154,13 @@ async function seedUsers() {
   const { getPool } = require('./db');
   const pool        = getPool();
 
+  // The users table is (id TEXT PRIMARY KEY, data JSONB) — see auth.initUsersTable().
+  // The whole user object lives in `data`; there are no per-field columns.
   for (const user of TEST_USERS) {
     await pool.query(
-      `INSERT INTO users (id, email, password_hash, first_name, last_name, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (email) DO NOTHING`,
-      [user.id, user.email, user.passwordHash, user.firstName, user.lastName, user.createdAt]
+      `INSERT INTO users (id, data) VALUES ($1, $2)
+       ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data`,
+      [user.id, JSON.stringify(user)]
     );
     console.log(`✅ User: ${user.email}`);
   }
@@ -149,16 +168,62 @@ async function seedUsers() {
 
 async function seedEvents() {
   for (const event of TEST_EVENTS) {
-    await upsertEvent(event);
-    console.log(`✅ Event: "${event.title}" (${event.date}) — ${event.recurrence}`);
+    // Events are owned; the store requires the owner id explicitly.
+    const ok = await upsertEvent(event, event.userId);
+    if (!ok) {
+      console.log(`⚠️  Event: "${event.title}" already exists under a different owner — skipped.`);
+      continue;
+    }
+    console.log(`✅ Event: "${event.title}" (${event.date}) — ${event.recurrence} → ${event.userId}`);
   }
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Refuse to seed a remote database unless explicitly confirmed.
+ *
+ * dotenv loads backend/.env, which on a developer machine normally contains the
+ * PRODUCTION Railway DATABASE_URL. Running `node seed.js` therefore writes test
+ * users and fake events straight into production unless something stops it.
+ * This is that something.
+ */
+function assertSafeTarget() {
+  const url = process.env.DATABASE_URL;
+  if (!url) return; // local JSON file mode — always safe
+
+  const isLocal = /@(localhost|127\.0\.0\.1|host\.docker\.internal)[:/]/.test(url);
+  if (isLocal) return;
+
+  if (process.env.SEED_ALLOW_REMOTE === 'yes') {
+    console.warn('⚠️  SEED_ALLOW_REMOTE=yes — seeding a REMOTE database on purpose.\n');
+    return;
+  }
+
+  const host = url.replace(/\/\/[^@]*@/, '//***@');
+  console.error(`
+❌ Refusing to seed a remote database.
+
+   Target: ${host}
+
+   backend/.env usually holds your PRODUCTION Railway connection string, and
+   seeding it would insert fake users and events into the live app.
+
+   To seed local data instead:
+       DATABASE_URL= node seed.js          # JSON file at backend/data/events.json
+
+   If you really do mean to seed the remote database:
+       SEED_ALLOW_REMOTE=yes node seed.js
+`);
+  process.exit(1);
+}
+
 async function main() {
   console.log('\n🌱 CelebConnect Seed Script');
   console.log('============================');
+
+  assertSafeTarget();
+
   console.log(`Mode: ${process.env.DATABASE_URL ? 'PostgreSQL' : 'Local JSON file'}\n`);
 
   if (process.env.DATABASE_URL) {

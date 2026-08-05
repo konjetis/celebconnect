@@ -1,7 +1,7 @@
 # Privacy Policy — CelebConnect
 
 **Effective date:** April 22, 2026
-**Last updated:** April 22, 2026
+**Last updated:** August 4, 2026
 
 CelebConnect ("we", "our", or "the app") is a mobile application that helps you remember and celebrate important events for people in your life. This Privacy Policy explains what information we collect, how we use it, and your rights.
 
@@ -12,8 +12,15 @@ CelebConnect ("we", "our", or "the app") is a mobile application that helps you 
 ### Information you provide directly
 - **Account information:** When you register, you provide a first name, last name, and either an email address or phone number, plus a password.
 - **Event data:** You create events with titles, dates, recurrence settings, and optional notes.
-- **Contact information:** You may add contacts (names, phone numbers, Instagram handles) to events so the app can help you send celebration messages.
-- **Profile photo:** Optionally uploaded and stored on your device.
+- **Contact information:** You may add contacts (names, phone numbers, Instagram handles) to events so the app can help you send celebration messages. These are stored with your event and are visible only to you.
+- **Message templates:** The text you write for each event, including any `{name}` placeholders.
+- **Profile photo:** Optional. If you set one, the image is uploaded to Cloudinary (see Section 3) and linked to your account.
+- **Instagram account details:** If you choose "Continue with Instagram", we receive your Instagram account ID, username, and display name from Meta, and use them to create or sign you in to a CelebConnect account. We do not receive your Instagram password, posts, followers, or direct messages.
+
+### Information collected with your permission
+- **Device contacts:** If you grant contacts permission, the app shows your address book so you can pick a person to add to an event. Only the contacts you explicitly select are saved. The rest are never uploaded or stored.
+- **Photo library:** If you grant photo permission, only the single image you choose as a profile picture is accessed.
+- **Push notification token:** A device identifier issued by Expo, used solely to deliver your own event reminders to your device.
 
 ### Information collected automatically
 - **Usage data:** We may collect anonymised crash reports and error logs to improve the app. This data does not include any personally identifiable information.
@@ -30,11 +37,29 @@ CelebConnect ("we", "our", or "the app") is a mobile application that helps you 
 
 | Purpose | Data used |
 |---------|-----------|
-| Providing the service (saving events, sending reminders) | Account info, event data, contacts |
-| Sending WhatsApp messages on your behalf | Contact phone numbers, message templates |
-| Sending notifications before events | Event dates, notification preferences |
+| Providing the service (saving events, showing your calendar) | Account info, event data, contacts |
+| Reminding you on the day | Event dates, notification preferences, push token |
+| Preparing a message for you to send | Contact name and phone number, your message template |
 | Improving the app (crash reports) | Anonymised error logs |
 | Authentication and session management | Email/phone, password (hashed), JWT tokens |
+| Signing you in with Instagram | Instagram account ID, username, display name |
+
+### How message sending works
+
+**We do not send messages on your behalf.** At your chosen time, our server sends
+a push notification to *your* device. When you tap it, your phone opens WhatsApp
+with the message pre-filled. You send it yourself, from your own WhatsApp account
+and your own phone number.
+
+This means your message content and your contacts' phone numbers are **never
+transmitted to Meta by us**. The only place they travel is between our server and
+your own device, over HTTPS, to populate that notification.
+
+### Your events are visible only to you
+
+Every event is tied to your account. Our API requires a valid authentication token
+on every request and returns only the events belonging to the signed-in account.
+No other user can read, modify, or delete your events or see your contacts.
 
 ---
 
@@ -42,9 +67,12 @@ CelebConnect ("we", "our", or "the app") is a mobile application that helps you 
 
 CelebConnect integrates with the following third-party services:
 
-- **WhatsApp Business Cloud API (Meta):** Used to send automated celebration messages. Your message content and recipient phone numbers are transmitted to Meta to deliver the message. Meta's Privacy Policy applies: https://www.whatsapp.com/legal/privacy-policy
-- **Instagram (Meta):** The app opens Instagram profiles in the Instagram app. No data is sent to Instagram through the app.
+- **Expo Push Notification Service:** Delivers your event reminders to your device. The notification payload includes the contact name, phone number, and message text needed to open WhatsApp, and is addressed only to your own device. Expo's Privacy Policy: https://expo.dev/privacy
+- **Instagram / Meta:** Two separate, optional uses. (1) The app can open an Instagram profile in the Instagram app — this sends nothing to Meta beyond the profile you are visiting. (2) If you use "Continue with Instagram", we perform an OAuth sign-in with Meta and receive your Instagram account ID, username, and display name. Meta's Privacy Policy: https://privacycenter.instagram.com/policy
+- **WhatsApp:** Opening a pre-filled message uses WhatsApp's standard deep link on your device. We do not use the WhatsApp Business API to message your contacts. Once you tap Send, WhatsApp's own Privacy Policy governs the message: https://www.whatsapp.com/legal/privacy-policy
 - **Railway (hosting):** Our backend server and database are hosted on Railway. Data is stored in a PostgreSQL database on Railway's infrastructure. Railway's Privacy Policy: https://railway.app/legal/privacy
+- **Cloudinary (image hosting):** If you upload a profile photo, it is stored on Cloudinary. Cloudinary's Privacy Policy: https://cloudinary.com/privacy
+- **Resend (email) and Twilio (SMS):** Used only to deliver password reset messages to you. Resend: https://resend.com/legal/privacy-policy · Twilio: https://www.twilio.com/en-us/legal/privacy
 
 ---
 
@@ -60,9 +88,11 @@ CelebConnect integrates with the following third-party services:
 ## 5. Data Sharing
 
 We do not sell, rent, or share your personal information with third parties for their marketing purposes. We may share data:
-- With service providers (Railway hosting) strictly to operate the app.
+- With the service providers listed in Section 3, strictly to operate the app.
 - If required by law, court order, or government authority.
 - To protect the rights, property, or safety of CelebConnect, its users, or the public.
+
+We never share your data with other CelebConnect users.
 
 ---
 

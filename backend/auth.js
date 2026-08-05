@@ -408,4 +408,4 @@ async function initUsersTable() {
   console.log('[DB] Users table ready.');
 }
 
-module.exports = { router, initUsersTable, getAllUsers, _resetTokenStore, storeResetToken, consumeResetToken };
+module.exports = { router, initUsersTable, getAllUsers, requireAuth, _resetTokenStore, storeResetToken, consumeResetToken };

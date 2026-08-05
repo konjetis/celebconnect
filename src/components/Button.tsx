@@ -3,7 +3,7 @@ import {
   TouchableOpacity, Text, ActivityIndicator,
   StyleSheet, ViewStyle, TextStyle,
 } from 'react-native';
-import { COLORS, SPACING } from '../utils/theme';
+import { COLORS } from '../utils/theme';
 
 interface ButtonProps {
   label: string;

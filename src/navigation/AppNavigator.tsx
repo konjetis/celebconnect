@@ -6,6 +6,7 @@ import { Text, ActivityIndicator, View, StyleSheet, Alert } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
 import { registerResetPasswordNavigator, registerInstagramCallbackHandler } from './navRegistry';
+import { exchangeInstagramCode } from '../services/authService';
 import { RootStackParamList, AuthStackParamList, MainTabParamList, CalendarStackParamList } from '../types';
 import { COLORS } from '../utils/theme';
 
@@ -108,9 +109,12 @@ export default function AppNavigator() {
       }
     });
 
-    registerInstagramCallbackHandler(async (token: string) => {
+    // Cold-start / background fallback: the OAuth callback deep-links back with a
+    // single-use login code. Exchange it for a JWT + user, then sign in.
+    registerInstagramCallbackHandler(async (code: string) => {
       try {
-        await loginWithInstagram(token);
+        const { token, user } = await exchangeInstagramCode(code);
+        await loginWithInstagram(token, user);
       } catch {
         Alert.alert('Instagram Login Failed', 'Could not complete sign-in. Please try again.');
       }

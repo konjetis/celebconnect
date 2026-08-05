@@ -1,7 +1,7 @@
 # Terms of Service — CelebConnect
 
 **Effective date:** April 22, 2026
-**Last updated:** April 22, 2026
+**Last updated:** August 4, 2026
 
 Please read these Terms of Service ("Terms") carefully before using CelebConnect (the "app", "service"). By creating an account or using the app, you agree to be bound by these Terms.
 
@@ -9,7 +9,9 @@ Please read these Terms of Service ("Terms") carefully before using CelebConnect
 
 ## 1. About CelebConnect
 
-CelebConnect is a mobile application that lets you schedule birthday, anniversary, and custom celebration events, and automatically sends WhatsApp messages to contacts on those dates.
+CelebConnect is a mobile application that lets you schedule birthday, anniversary, and custom celebration events, and reminds you on the day with a notification that opens WhatsApp with your message pre-filled, ready for you to send.
+
+CelebConnect does not send messages on your behalf. You perform the final send yourself, from your own WhatsApp account.
 
 ---
 
@@ -46,12 +48,27 @@ Violation of these rules may result in immediate termination of your account.
 
 ## 5. WhatsApp Messaging
 
-CelebConnect uses the WhatsApp Business Cloud API to send messages on your behalf. By enabling WhatsApp messaging:
+CelebConnect prepares messages for you; it does not send them. When you tap a
+reminder, your device opens WhatsApp with the recipient and message text already
+filled in. Nothing is sent until you tap Send inside WhatsApp. Messages are sent
+from your own WhatsApp account and your own phone number.
 
-- You confirm that you have obtained consent from your recipients to receive messages from you via WhatsApp.
-- You are solely responsible for the content of messages sent through the app.
-- You agree to comply with Meta's WhatsApp Business Policy: https://www.whatsapp.com/legal/business-policy
-- We are not responsible for messages blocked or flagged by WhatsApp.
+By using the WhatsApp integration:
+
+- You are solely responsible for the content of the messages you send and for who you send them to.
+- You confirm your recipients are people you have an existing personal relationship with and who would reasonably expect to hear from you.
+- You agree to comply with WhatsApp's Terms of Service: https://www.whatsapp.com/legal/terms-of-service
+- We are not responsible for messages blocked, delayed, or flagged by WhatsApp.
+
+---
+
+## 5a. Instagram Login
+
+If you sign in with Instagram, you authorise us to receive your Instagram account
+ID, username, and display name from Meta in order to create or access your
+CelebConnect account. You may instead register with an email address or phone
+number. Revoking CelebConnect's access in your Instagram settings will prevent
+future Instagram sign-ins; contact us to delete the associated account.
 
 ---
 

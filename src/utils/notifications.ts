@@ -102,7 +102,6 @@ export async function notifyTodayEventNow(event: CalendarEvent): Promise<void> {
   for (let i = 0; i < waContacts.length; i++) {
     const contact = waContacts[i];
     const message = template.replace(/\{name\}/g, contact.name);
-    const cleanPhone = (contact.phone ?? '').replace(/[^\d]/g, '');
 
     await Notifications.scheduleNotificationAsync({
       content: {

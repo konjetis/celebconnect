@@ -12,10 +12,9 @@ const { getAllUsers } = require('../auth');
 
 // ─── Mock store ───────────────────────────────────────────────────────────────
 jest.mock('../store', () => ({
-  getEventsForDate: jest.fn(),
-  readAll: jest.fn(),
+  readAllForScheduler: jest.fn(),
 }));
-const { getEventsForDate, readAll } = require('../store');
+const { readAllForScheduler } = require('../store');
 
 const { recurringEventMatchesToday, sendTodaysMessages } = require('../scheduler');
 
@@ -100,7 +99,19 @@ describe('recurringEventMatchesToday', () => {
 
 // ─── sendTodaysMessages — push notification flow ──────────────────────────────
 
-const TODAY = new Date().toISOString().split('T')[0];
+// Must match scheduler.getTodayString(), which uses LOCAL date parts.
+// toISOString() would give the UTC date, which differs from local for part of
+// every day in any non-UTC timezone and would make these tests flaky.
+const TODAY = (() => {
+  const d = new Date();
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
+})();
+
+const OWNER = 'u1';
 
 const makeEvent = (overrides = {}) => ({
   id: 'evt-1',
@@ -110,19 +121,19 @@ const makeEvent = (overrides = {}) => ({
   whatsappEnabled: true,
   contacts: [{ name: 'Alice', phone: '+1234567890' }],
   whatsappMessage: 'Happy Birthday {name}!',
+  userId: OWNER,
   ...overrides,
 });
 
 beforeEach(() => {
   jest.clearAllMocks();
   axios.post.mockResolvedValue({ data: { data: [{ status: 'ok' }] } });
-  readAll.mockResolvedValue([]);
+  readAllForScheduler.mockResolvedValue([]);
 });
 
 describe('sendTodaysMessages — no events', () => {
   it('does nothing when there are no events today', async () => {
-    getEventsForDate.mockResolvedValue([]);
-    readAll.mockResolvedValue([]);
+    readAllForScheduler.mockResolvedValue([]);
     await sendTodaysMessages();
     expect(axios.post).not.toHaveBeenCalled();
   });
@@ -130,8 +141,8 @@ describe('sendTodaysMessages — no events', () => {
 
 describe('sendTodaysMessages — no push tokens', () => {
   it('skips sending when no users have registered push tokens', async () => {
-    getEventsForDate.mockResolvedValue([makeEvent()]);
-    getAllUsers.mockResolvedValue([{ id: 'u1', email: 'a@b.com' }]); // no expoPushToken
+    readAllForScheduler.mockResolvedValue([makeEvent()]);
+    getAllUsers.mockResolvedValue([{ id: OWNER, email: 'a@b.com' }]); // no expoPushToken
     await sendTodaysMessages();
     expect(axios.post).not.toHaveBeenCalled();
   });
@@ -140,12 +151,12 @@ describe('sendTodaysMessages — no push tokens', () => {
 describe('sendTodaysMessages — push notification sent', () => {
   beforeEach(() => {
     getAllUsers.mockResolvedValue([
-      { id: 'u1', email: 'owner@example.com', expoPushToken: 'ExponentPushToken[abc123]' },
+      { id: OWNER, email: 'owner@example.com', expoPushToken: 'ExponentPushToken[abc123]' },
     ]);
   });
 
   it('calls Expo Push API for each whatsappEnabled contact', async () => {
-    getEventsForDate.mockResolvedValue([
+    readAllForScheduler.mockResolvedValue([
       makeEvent({
         contacts: [
           { name: 'Alice', phone: '+1111111111' },
@@ -168,8 +179,21 @@ describe('sendTodaysMessages — push notification sent', () => {
     );
   });
 
+  it('returns the number of notifications sent', async () => {
+    readAllForScheduler.mockResolvedValue([
+      makeEvent({
+        contacts: [
+          { name: 'Alice', phone: '+1111111111' },
+          { name: 'Bob',   phone: '+2222222222' },
+        ],
+      }),
+    ]);
+
+    await expect(sendTodaysMessages()).resolves.toBe(2);
+  });
+
   it('interpolates {name} placeholder in the message', async () => {
-    getEventsForDate.mockResolvedValue([
+    readAllForScheduler.mockResolvedValue([
       makeEvent({
         whatsappMessage: 'Hey {name}, happy birthday!',
         contacts: [{ name: 'Carol', phone: '+3333333333' }],
@@ -183,13 +207,13 @@ describe('sendTodaysMessages — push notification sent', () => {
   });
 
   it('skips events where whatsappEnabled is false', async () => {
-    getEventsForDate.mockResolvedValue([makeEvent({ whatsappEnabled: false })]);
+    readAllForScheduler.mockResolvedValue([makeEvent({ whatsappEnabled: false })]);
     await sendTodaysMessages();
     expect(axios.post).not.toHaveBeenCalled();
   });
 
   it('skips contacts without a phone number', async () => {
-    getEventsForDate.mockResolvedValue([
+    readAllForScheduler.mockResolvedValue([
       makeEvent({
         contacts: [
           { name: 'No Phone' },
@@ -206,7 +230,7 @@ describe('sendTodaysMessages — push notification sent', () => {
   });
 
   it('skips Instagram-only contacts (no phone)', async () => {
-    getEventsForDate.mockResolvedValue([
+    readAllForScheduler.mockResolvedValue([
       makeEvent({
         contacts: [{ name: 'IGUser', instagramHandle: '@iguser' }],
       }),
@@ -221,7 +245,7 @@ describe('sendTodaysMessages — push notification sent', () => {
       .mockRejectedValueOnce(new Error('Network error'))
       .mockResolvedValueOnce({ data: {} });
 
-    getEventsForDate.mockResolvedValue([
+    readAllForScheduler.mockResolvedValue([
       makeEvent({
         contacts: [
           { name: 'Fail',    phone: '+5555555555' },
@@ -230,25 +254,92 @@ describe('sendTodaysMessages — push notification sent', () => {
       }),
     ]);
 
-    await expect(sendTodaysMessages()).resolves.not.toThrow();
+    await expect(sendTodaysMessages()).resolves.toBe(1);
     expect(axios.post).toHaveBeenCalledTimes(2);
   });
 
-  it('sends to multiple registered push tokens', async () => {
+  it('skips an event whose owner has no registered device', async () => {
+    readAllForScheduler.mockResolvedValue([makeEvent({ userId: 'someone-else' })]);
+    await sendTodaysMessages();
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Cross-user isolation ─────────────────────────────────────────────────────
+// Regression tests for the pre-1.0 bug where the scheduler collected push tokens
+// from ALL users and sent every event to every device — leaking contacts' real
+// phone numbers to strangers.
+
+describe('sendTodaysMessages — cross-user isolation', () => {
+  const ALICE = 'user-alice';
+  const BOB   = 'user-bob';
+
+  beforeEach(() => {
     getAllUsers.mockResolvedValue([
-      { id: 'u1', expoPushToken: 'ExponentPushToken[token1]' },
-      { id: 'u2', expoPushToken: 'ExponentPushToken[token2]' },
+      { id: ALICE, expoPushToken: 'ExponentPushToken[alice]' },
+      { id: BOB,   expoPushToken: 'ExponentPushToken[bob]' },
     ]);
-    getEventsForDate.mockResolvedValue([
-      makeEvent({ contacts: [{ name: 'Dave', phone: '+7777777777' }] }),
+  });
+
+  it('sends each event only to the device of the user who owns it', async () => {
+    readAllForScheduler.mockResolvedValue([
+      makeEvent({
+        id: 'a-1',
+        userId: ALICE,
+        contacts: [{ name: "Alice's Mum", phone: '+1111111111' }],
+      }),
+      makeEvent({
+        id: 'b-1',
+        userId: BOB,
+        contacts: [{ name: "Bob's Dad", phone: '+2222222222' }],
+      }),
     ]);
 
     await sendTodaysMessages();
 
-    // 1 contact × 2 tokens = 2 calls
     expect(axios.post).toHaveBeenCalledTimes(2);
-    const tokens = axios.post.mock.calls.map(c => c[1].to);
-    expect(tokens).toContain('ExponentPushToken[token1]');
-    expect(tokens).toContain('ExponentPushToken[token2]');
+
+    const byToken = Object.fromEntries(
+      axios.post.mock.calls.map(c => [c[1].to, c[1].data])
+    );
+
+    expect(byToken['ExponentPushToken[alice]'].waPhone).toBe('+1111111111');
+    expect(byToken['ExponentPushToken[bob]'].waPhone).toBe('+2222222222');
+  });
+
+  it("never puts one user's contact phone number on another user's device", async () => {
+    readAllForScheduler.mockResolvedValue([
+      makeEvent({
+        id: 'a-1',
+        userId: ALICE,
+        contacts: [{ name: "Alice's Mum", phone: '+1111111111' }],
+      }),
+    ]);
+
+    await sendTodaysMessages();
+
+    const bobsPushes = axios.post.mock.calls.filter(
+      c => c[1].to === 'ExponentPushToken[bob]'
+    );
+    expect(bobsPushes).toHaveLength(0);
+  });
+
+  it('onlyUserId restricts the run to a single user', async () => {
+    readAllForScheduler.mockResolvedValue([
+      makeEvent({ id: 'a-1', userId: ALICE, contacts: [{ name: 'A', phone: '+1111111111' }] }),
+      makeEvent({ id: 'b-1', userId: BOB,   contacts: [{ name: 'B', phone: '+2222222222' }] }),
+    ]);
+
+    const sent = await sendTodaysMessages({ onlyUserId: ALICE });
+
+    expect(sent).toBe(1);
+    expect(axios.post).toHaveBeenCalledTimes(1);
+    expect(axios.post.mock.calls[0][1].to).toBe('ExponentPushToken[alice]');
+  });
+
+  it('ignores events with no owner', async () => {
+    readAllForScheduler.mockResolvedValue([makeEvent({ userId: undefined })]);
+    await sendTodaysMessages();
+    expect(axios.post).not.toHaveBeenCalled();
   });
 });

@@ -12,7 +12,7 @@
 
 const cron  = require('node-cron');
 const axios = require('axios');
-const { getEventsForDate, readAll } = require('./store');
+const { readAllForScheduler } = require('./store');
 const { getAllUsers } = require('./auth');
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -67,19 +67,19 @@ function recurringEventMatchesToday(event, todayStr) {
 /**
  * Returns all events that should fire today —
  * both exact-date matches AND recurring events whose pattern fires today.
+ *
+ * Each event carries its owning userId so callers can route notifications to
+ * the right device. Pass onlyUserId to restrict the result to one user.
  */
-async function getEventsForToday(todayStr) {
-  // Direct date matches (non-recurring events set for today)
-  const exactMatches = await getEventsForDate(todayStr);
-  const exactIds = new Set(exactMatches.map(e => e.id));
+async function getEventsForToday(todayStr, onlyUserId = null) {
+  const allEvents = await readAllForScheduler();
+  const scoped    = onlyUserId
+    ? allEvents.filter(e => e.userId === onlyUserId)
+    : allEvents;
 
-  // Check all events for recurring matches
-  const allEvents      = await readAll();
-  const recurringToday = allEvents.filter(
-    e => !exactIds.has(e.id) && recurringEventMatchesToday(e, todayStr)
+  return scoped.filter(
+    e => e.date === todayStr || recurringEventMatchesToday(e, todayStr)
   );
-
-  return [...exactMatches, ...recurringToday];
 }
 
 // ─── Message helpers ──────────────────────────────────────────────────────────
@@ -133,28 +133,49 @@ async function sendPushNotification({ expoPushToken, title, body, data }) {
 
 // ─── Main send function ───────────────────────────────────────────────────────
 
-async function sendTodaysMessages() {
+/**
+ * Sends today's reminders.
+ *
+ * Each event's notification goes ONLY to the device of the user who owns that
+ * event. Never broadcast: a notification carries a contact's real phone number
+ * in its payload, so sending it to the wrong device is a data leak.
+ *
+ * @param {object}  [opts]
+ * @param {string}  [opts.onlyUserId] Restrict to a single user (used by /api/send-now).
+ * @returns {Promise<number>} How many push notifications were sent.
+ */
+async function sendTodaysMessages({ onlyUserId = null } = {}) {
   const today  = getTodayString();
-  const events = await getEventsForToday(today);
+  const events = await getEventsForToday(today, onlyUserId);
 
   if (events.length === 0) {
     console.log(`[${new Date().toISOString()}] No events today (${today}).`);
-    return;
+    return 0;
   }
 
   console.log(`[${new Date().toISOString()}] Processing ${events.length} event(s) for ${today}...`);
 
-  // Collect all Expo push tokens from registered users
-  const allUsers   = await getAllUsers();
-  const pushTokens = allUsers.map(u => u.expoPushToken).filter(Boolean);
+  // Map each user id to their push token, so an event can be routed to its owner.
+  const allUsers  = await getAllUsers();
+  const tokenById = new Map(
+    allUsers.filter(u => u.expoPushToken).map(u => [u.id, u.expoPushToken])
+  );
 
-  if (pushTokens.length === 0) {
+  if (tokenById.size === 0) {
     console.log('  ⚠️  No push tokens registered — no notifications sent.');
-    return;
+    return 0;
   }
+
+  let sent = 0;
 
   for (const event of events) {
     if (!event.whatsappEnabled) continue;
+
+    const ownerToken = tokenById.get(event.userId);
+    if (!ownerToken) {
+      console.log(`  ⏭  "${event.title}" — owner ${event.userId} has no registered device. Skipping.`);
+      continue;
+    }
 
     const baseTemplate     = event.whatsappMessage || `Happy ${event.title}! 🎉`;
     const template         = enrichTemplate(baseTemplate, event, today);
@@ -168,31 +189,31 @@ async function sendTodaysMessages() {
     for (const contact of whatsappContacts) {
       const message = replacePlaceholders(template, contact.name);
 
-      // Send one push notification per token (usually just one — the owner's phone)
-      for (const token of pushTokens) {
-        try {
-          await sendPushNotification({
-            expoPushToken: token,
-            title: `${event.title} 🎉`,
-            body:  `Tap to send ${contact.name} a WhatsApp message`,
-            data: {
-              phone:    contact.name,    // display name for the notification
-              waPhone:  contact.phone,   // actual phone number for the deep link
-              message,
-              eventId:  event.id,
-              eventTitle: event.title,
-            },
-          });
-          console.log(`  ✅ Push sent for "${event.title}" → ${contact.name} (${contact.phone})`);
-        } catch (err) {
-          console.error(`  ❌ Push failed for "${event.title}" → ${contact.name}:`, err.message);
-        }
+      try {
+        await sendPushNotification({
+          expoPushToken: ownerToken,
+          title: `${event.title} 🎉`,
+          body:  `Tap to send ${contact.name} a WhatsApp message`,
+          data: {
+            phone:    contact.name,    // display name for the notification
+            waPhone:  contact.phone,   // actual phone number for the deep link
+            message,
+            eventId:  event.id,
+            eventTitle: event.title,
+          },
+        });
+        sent += 1;
+        console.log(`  ✅ Push sent for "${event.title}" → ${contact.name} (owner ${event.userId})`);
+      } catch (err) {
+        console.error(`  ❌ Push failed for "${event.title}" → ${contact.name}:`, err.message);
       }
 
       // Small delay between sends
       await new Promise(resolve => setTimeout(resolve, 300));
     }
   }
+
+  return sent;
 }
 
 // ─── Scheduler ────────────────────────────────────────────────────────────────

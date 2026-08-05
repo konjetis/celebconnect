@@ -5,7 +5,64 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.0.0] — 2026-04-23
+## [1.0.0] — 2026-08-04
+
+### Security
+
+- **Event API now requires authentication and is scoped per user.** `GET`, `POST`
+  and `DELETE /api/events` previously had no auth and operated on a single global
+  event collection, so any caller could read every user's events (including
+  contact names and phone numbers), overwrite any event by reusing its id, or
+  delete any event. All three routes now require a JWT and only ever touch rows
+  owned by the token holder. A client-supplied `userId` is ignored.
+- **Scheduler no longer broadcasts reminders to every device.** It collected push
+  tokens from all users and sent each event's notification to all of them —
+  meaning one user's contact's phone number was delivered to every other user's
+  phone. Each event is now pushed only to its owner's device.
+- `POST /api/send-now` is authenticated and scoped to the caller.
+- Added `user_id` to the events table, with an index and an automatic
+  `ADD COLUMN IF NOT EXISTS` migration on boot. Pre-migration rows are hidden
+  from everyone until claimed via `ADOPT_ORPHAN_EVENTS_USER_ID` (fail-closed).
+- Added regression tests for all of the above: 11 API-level isolation tests in
+  `backend/__tests__/events.api.test.js`, plus store- and scheduler-level tests.
+- The mobile app now sends its JWT with every event sync request.
+
+### Fixed
+
+- Instagram login was broken end to end: the backend redirects to
+  `celebconnect://instagram-callback?code=…` but the app read `?token=`, so
+  cold-start Instagram sign-in silently did nothing. The app now exchanges the
+  one-time code via `authService.exchangeInstagramCode()`.
+- Fixed a TypeScript compile error in `AppNavigator.tsx` (`loginWithInstagram`
+  called with one argument) that was failing CI.
+- Removed unused `READ_CALENDAR` / `WRITE_CALENDAR` permissions and the
+  `NSCalendarsUsageDescription` string — the app has no calendar integration and
+  both stores flag unused sensitive permissions.
+- Added the missing `NSPhotoLibraryUsageDescription`, which `AccountScreen`
+  requires for profile photo upload.
+- De-duplicated `LSApplicationQueriesSchemes` in `app.json`.
+- Fixed a latent timezone bug in the scheduler tests that built "today" in UTC
+  while the scheduler uses local time.
+
+### Changed
+
+- **Store listing, README, Terms and Privacy Policy no longer claim "auto-send".**
+  The app moved to push-notification → one-tap sending; the marketing copy hadn't
+  caught up, which risks rejection under App Store Guideline 2.3.1. Documented
+  why auto-send is neither possible on iOS nor permitted by Meta's Business
+  Messaging Policy.
+- Privacy Policy now discloses Instagram OAuth data collection, Cloudinary,
+  Resend, Twilio, and the Expo push service; added an App Store Connect privacy
+  questionnaire crib sheet to `APP_STORE_METADATA.md`.
+- `backend/.env.example` now documents all 21 environment variables the code
+  reads (was 10).
+- Added an ESLint config so `npm run lint` works, added `npm run typecheck`, and
+  added a lint job to CI.
+- Untracked the generated `coverage/` directory and `.DS_Store` files.
+
+---
+
+## [0.9.0] — 2026-04-23
 
 ### Added
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, Switch, Alert,
@@ -8,7 +8,7 @@ import ContactPickerModal from '../../components/ContactPickerModal';
 import GroupPickerModal from '../../components/GroupPickerModal';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { CalendarStackParamList, CalendarEvent, EventCategory, RecurrenceType, EventContact } from '../../types';
+import { CalendarStackParamList, EventCategory, RecurrenceType, EventContact } from '../../types';
 import { useEvents } from '../../context/EventContext';
 import { COLORS, SPACING } from '../../utils/theme';
 import { saveGroup } from '../../services/savedGroupsService';

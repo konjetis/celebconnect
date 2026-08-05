@@ -1,6 +1,6 @@
 # 🎉 CelebConnect
 
-> Never miss a birthday or anniversary — CelebConnect automatically sends WhatsApp messages to the people who matter, every year, on the day.
+> Never miss a birthday or anniversary. Write the message once; CelebConnect nudges you on the day and sends it from your own WhatsApp in a single tap.
 
 [![CI](https://github.com/konjetis/celebconnect/actions/workflows/ci.yml/badge.svg)](https://github.com/konjetis/celebconnect/actions/workflows/ci.yml)
 
@@ -9,10 +9,21 @@
 ## What It Does
 
 - Add birthdays, anniversaries, and custom events once
-- Auto-send personalised WhatsApp greetings every morning at your chosen time
+- Write a personalised message template per person, with `{name}` placeholders
+- Get a push notification at your chosen time on the day — tap it once and WhatsApp opens with the message already written, ready to send
+- Send to saved WhatsApp groups, not just individuals
 - Set reminders 1–7 days before events so you're never caught off-guard
 - Open Instagram profiles instantly to post a story or DM
-- Works offline — events and notifications work without internet
+- Works offline — events and local notifications work without internet
+
+### A note on "auto-send"
+
+CelebConnect deliberately does **not** send messages on your behalf. Two reasons:
+
+1. **iOS won't allow it.** No third-party app can send a WhatsApp message without user interaction. Any app claiming otherwise is Android-only.
+2. **Meta's Business Messaging Policy forbids it.** The WhatsApp Business API requires explicit prior opt-in from every recipient. Blasting personal greetings through it gets the sending number restricted or permanently disabled.
+
+So the last step is always yours: one tap. The message arrives from your personal number, which is what the recipient wants anyway.
 
 ---
 
@@ -23,7 +34,7 @@
 | Mobile app | React Native (Expo SDK 54) |
 | Backend | Node.js + Express |
 | Database | PostgreSQL (Railway) |
-| Messaging | WhatsApp Business Cloud API |
+| Reminders | Expo Push Notifications → WhatsApp deep link |
 | Auth | JWT + bcrypt |
 | Build & Submit | EAS (Expo Application Services) |
 | Hosting | Railway |
@@ -163,15 +174,22 @@ See [APP_STORE_METADATA.md](./APP_STORE_METADATA.md) for store listing content.
 
 ### Backend (`backend/.env`)
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string (Railway auto-sets this) |
-| `WHATSAPP_ACCESS_TOKEN` | WhatsApp Business Cloud API permanent token |
-| `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp Business phone number ID |
-| `AUTH_JWT_SECRET` | Secret for signing JWT tokens (48+ random bytes) |
-| `SEND_HOUR` | Hour to send daily messages (24h, default: 9) |
-| `SEND_MINUTE` | Minute to send daily messages (default: 0) |
-| `PORT` | Server port (Railway sets this automatically) |
+See [`backend/.env.example`](./backend/.env.example) for the full annotated list.
+The essentials:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | ✅ | PostgreSQL connection string (Railway auto-sets this) |
+| `AUTH_JWT_SECRET` | ✅ | Secret for signing JWT tokens (48+ random bytes) |
+| `PORT` | ✅ | Server port (Railway sets this automatically) |
+| `SEND_HOUR` | | Hour to send daily reminders (24h, default: 9) |
+| `SEND_MINUTE` | | Minute to send daily reminders (default: 0) |
+| `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` | | Instagram Business Login |
+| `RESEND_API_KEY` / `RESEND_FROM` | | Password reset via email |
+| `TWILIO_*` | | Password reset via SMS |
+| `CLOUDINARY_*` | | Profile photo uploads |
+| `SENTRY_DSN` | | Error monitoring |
+| `ADOPT_ORPHAN_EVENTS_USER_ID` | | One-off migration: claim pre-1.0 ownerless events |
 
 ### Mobile app
 
@@ -183,17 +201,23 @@ See [APP_STORE_METADATA.md](./APP_STORE_METADATA.md) for store listing content.
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| POST | `/api/auth/register` | Create account |
-| POST | `/api/auth/login` | Sign in, returns JWT |
-| GET | `/api/auth/me` | Get current user (auth required) |
-| PATCH | `/api/auth/profile` | Update profile (auth required) |
-| GET | `/api/events` | List all events |
-| POST | `/api/events` | Create/update event |
-| DELETE | `/api/events/:id` | Delete event |
-| POST | `/api/send-now` | Manually trigger today's WhatsApp sends |
+All `/api/events` routes require a `Authorization: Bearer <jwt>` header and are
+scoped to the token holder. A user can only ever read or modify their own events.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/health` | — | Health check |
+| POST | `/api/auth/register` | — | Create account |
+| POST | `/api/auth/login` | — | Sign in, returns JWT |
+| GET | `/api/auth/me` | ✅ | Get current user |
+| PATCH | `/api/auth/profile` | ✅ | Update profile |
+| POST | `/api/auth/push-token` | ✅ | Register this device for reminders |
+| GET | `/api/instagram` | — | Start Instagram OAuth |
+| GET | `/api/instagram/exchange` | — | Exchange a one-time login code for a JWT |
+| GET | `/api/events` | ✅ | List **your** events |
+| POST | `/api/events` | ✅ | Create/update one of **your** events |
+| DELETE | `/api/events/:id` | ✅ | Delete one of **your** events |
+| POST | `/api/send-now` | ✅ | Trigger **your** reminders for today |
 
 ---
 

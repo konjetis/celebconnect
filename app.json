@@ -20,13 +20,10 @@
       "bundleIdentifier": "com.celebconnect.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCalendarsUsageDescription": "CelebConnect needs access to your calendar to manage your events.",
         "NSContactsUsageDescription": "CelebConnect needs access to contacts to send celebration messages.",
+        "NSPhotoLibraryUsageDescription": "CelebConnect needs access to your photos so you can set a profile picture.",
         "NSUserNotificationsUsageDescription": "CelebConnect sends you reminders before important events.",
         "LSApplicationQueriesSchemes": [
-          "whatsapp",
-          "instagram",
-          "instagram-stories",
           "whatsapp",
           "instagram",
           "instagram-stories"
@@ -42,8 +39,6 @@
       "package": "com.celebconnect.app",
       "versionCode": 1,
       "permissions": [
-        "READ_CALENDAR",
-        "WRITE_CALENDAR",
         "READ_CONTACTS",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE"

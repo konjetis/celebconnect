@@ -49,7 +49,9 @@ export function useAsync<T>(
 
   useEffect(() => {
     if (immediate) { execute().catch(() => {}); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Intentionally runs once on mount only. Including `execute` would re-fire
+    // the request whenever the caller passes a new inline asyncFn.
+    // eslint-disable-next-line
   }, []);
 
   return { ...state, execute };

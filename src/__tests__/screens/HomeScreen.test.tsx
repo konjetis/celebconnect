@@ -45,7 +45,6 @@ const makeEvent = (overrides: Partial<CalendarEvent> = {}): CalendarEvent => ({
 });
 
 // We build a configurable events mock factory
-let mockEvents: CalendarEvent[] = [];
 let mockUpcomingEvents: CalendarEvent[] = [];
 
 jest.mock('../../context/EventContext', () => ({
@@ -65,7 +64,6 @@ jest.mock('../../context/EventContext', () => ({
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  mockEvents = [];
   mockUpcomingEvents = [];
   mockDeleteEvent.mockClear();
   mockLoadEvents.mockClear();

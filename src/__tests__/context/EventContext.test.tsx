@@ -58,7 +58,7 @@ function TestConsumer({
   onAddEvent?: () => void;
   onDeleteEvent?: (id: string) => void;
 }) {
-  const { events, isLoading, addEvent, deleteEvent } = useEvents();
+  const { events, isLoading } = useEvents();
 
   return (
     <>

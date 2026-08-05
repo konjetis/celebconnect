@@ -104,9 +104,10 @@ function handleUrl(url: string) {
         break;
       }
       case 'instagram-callback': {
-        const token = parsed.searchParams.get('token');
+        // Backend redirects with a single-use login code (not a raw JWT).
+        const code  = parsed.searchParams.get('code');
         const error = parsed.searchParams.get('error');
-        if (token) handleInstagramCallback(token);
+        if (code) handleInstagramCallback(code);
         else if (error) console.warn('[DeepLink] Instagram login error:', error);
         break;
       }

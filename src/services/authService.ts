@@ -98,6 +98,18 @@ export async function forgotPassword(identifier: string): Promise<void> {
 }
 
 /**
+ * Exchange a short-lived Instagram login code for a CelebConnect JWT + user.
+ * The code arrives from the backend OAuth callback (deep link or auth session)
+ * and is single-use, valid for 5 minutes.
+ */
+export async function exchangeInstagramCode(code: string): Promise<AuthResponse> {
+  return request<AuthResponse>(
+    `/api/instagram/exchange?code=${encodeURIComponent(code)}`,
+    { method: 'GET' }
+  );
+}
+
+/**
  * Validate the current session token.
  * Returns the current user, or throws if the token is invalid/expired.
  */
